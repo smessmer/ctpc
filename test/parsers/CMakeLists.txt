@@ -1,6 +1,18 @@
 project(parsers-test)
 
 set(SOURCES
+	alpha_test.cpp
+	alternative_test.cpp
+	basic_parsers_test.cpp
+	elem_test.cpp
+	integer_test.cpp
+	map_test.cpp
+	opt_test.cpp
+	parse_result_test.cpp
+    phrase_test.cpp
+	rep_test.cpp
+	seq_test.cpp
+	string_test.cpp
 	utils/cvector_test.cpp
 )
 
