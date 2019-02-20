@@ -1,5 +1,10 @@
 #include "parsers/alternative.h"
 #include "parsers/string.h"
+#include "parsers/elem.h"
+#include "parsers/map.h"
+#include "testutils/move_helpers.h"
+
+#include <gtest/gtest.h>
 
 using namespace ctpc;
 
@@ -103,6 +108,62 @@ namespace test_alternative_three_failure_none_is_longest_match {
     static_assert(!parsed.is_success());
     // return the position from the parser that had the longest match before failing (i.e. "On")
     static_assert(parsed.next().input == "SomethingElse");
+}
+
+namespace test_alternative_works_with_movable_only_parsers_success {
+    constexpr auto parsed = alternative(movable_only(string("One")), movable_only(string("OnTwo")))(Input{"OnTwoAndSomeText"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result() == "OnTwo");
+    static_assert(parsed.next().input == "AndSomeText");
+}
+
+namespace test_alternative_works_with_movable_only_parsers_failure {
+    constexpr auto parsed = alternative(movable_only(string("Ones")), movable_only(string("OnTwo")), movable_only(string("OnThree")))(Input{"OnTwThree"});
+    static_assert(!parsed.is_success());
+    // return the position from the parser that had the longest match before failing (i.e. "OneTw")
+    static_assert(parsed.next().input == "Three");
+}
+
+namespace test_alternative_works_with_convertible_types_intdouble {
+    constexpr auto int_parser = mapValue<int>(elem('a'), int(1));
+    constexpr auto double_parser = mapValue<double>(elem('b'), double(2));
+
+    constexpr auto parser1 = alternative(int_parser, double_parser);
+    static_assert(std::is_same_v<double, parser_result_t<decltype(parser1)>>);
+    constexpr auto parsed1_1 = parser1(Input{"a"}).result();
+    static_assert(std::is_same_v<const double, decltype(parsed1_1)>);
+    static_assert(1 == parsed1_1);
+    constexpr auto parsed1_2 = parser1(Input{"b"}).result();
+    static_assert(std::is_same_v<const double, decltype(parsed1_2)>);
+    static_assert(2 == parsed1_2);
+}
+
+namespace test_alternative_works_with_convertible_types_doubleintfloat {
+    constexpr auto int_parser = mapValue<int>(elem('a'), int(1));
+    constexpr auto double_parser = mapValue<double>(elem('b'), double(2));
+    constexpr auto float_parser = mapValue<float>(elem('c'), float(3));
+
+    constexpr auto parser2 = alternative(double_parser, int_parser, float_parser);
+    static_assert(std::is_same_v<double, parser_result_t<decltype(parser2)>>);
+    constexpr auto parsed2_1 = parser2(Input{"a"}).result();
+    static_assert(std::is_same_v<const double, decltype(parsed2_1)>);
+    static_assert(1 == parsed2_1);
+    constexpr auto parsed2_2 = parser2(Input{"b"}).result();
+    static_assert(std::is_same_v<const double, decltype(parsed2_2)>);
+    static_assert(2 == parsed2_2);
+    constexpr auto parsed2_3 = parser2(Input{"c"}).result();
+    static_assert(std::is_same_v<const double, decltype(parsed2_3)>);
+    static_assert(3 == parsed2_3);
+}
+
+TEST(AlternativeParserTest, doesntCopyOrMoveMoreThanAbsolutelyNecessary) {
+    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
+            [] (auto&&... args) {return alternative(std::forward<decltype(args)>(args)...); },
+            {ctpc::Input{""}, ctpc::Input{"OnTwoSomeText"}, ctpc::Input{"SomethingElse"}},
+            [] () {return string("One");},
+            [] () {return string("OnTwo");},
+            [] () {return string("OnThree");}
+    );
 }
 
 }

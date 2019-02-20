@@ -1,6 +1,7 @@
 #include "parsers/seq.h"
 #include "parsers/string.h"
 #include "parsers/integer.h"
+#include "testutils/move_helpers.h"
 
 using namespace ctpc;
 
@@ -60,6 +61,28 @@ namespace test_seq_three_fail_third {
     constexpr auto parsed = seq(string("ABC"), string("DE"), integer())(Input{"ABCDEFGH"});
     static_assert(!parsed.is_success());
     static_assert(parsed.next().input == "FGH");
+}
+
+namespace test_seq_movableonly_success {
+    constexpr auto parsed = seq(movable_only(string("ABC")), movable_only(string("DE")), movable_only(integer()))(Input{"ABCDE23FGH"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result() == std::tuple<std::string_view, std::string_view, int>{"ABC", "DE", 23});
+    static_assert(parsed.next().input == "FGH");
+}
+namespace test_seq_movableonly_failure {
+    constexpr auto parsed = seq(movable_only(string("ABC")), movable_only(string("DE")), movable_only(integer()))(Input{"ABCDA23FGH"});
+    static_assert(!parsed.is_success());
+    static_assert(parsed.next().input == "A23FGH");
+}
+
+TEST(SeqParserTest, doesntCopyOrMoveMoreThanAbsolutelyNecessary) {
+    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
+        [] (auto&&... args) {return seq(std::forward<decltype(args)>(args)...); },
+        {ctpc::Input{""}, ctpc::Input{"ABCDE"}, ctpc::Input{"ABC_"}, ctpc::Input{"ABCDEF"}},
+        [] () {return string("AB");},
+        [] () {return string("CD");},
+        [] () {return string("EF");}
+    );
 }
 
 }

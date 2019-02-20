@@ -7,11 +7,10 @@
 
 namespace ctpc {
 
-// TODO Test this moves/copies elementParser/separatorParser correctly (i.e. works with movable-only and also count number of moves/copies)
 template<size_t MAX_REPETITIONS = 1024, class ElementParser, class SeparatorParser>
-constexpr auto repsep(ElementParser elementParser, SeparatorParser separatorParser) {
+constexpr auto repsep(ElementParser&& elementParser, SeparatorParser&& separatorParser) {
     using parse_result = ParseResult<cvector<parser_result_t<ElementParser>, MAX_REPETITIONS>>;
-    return [elementParser = std::move(elementParser), separatorParser = std::move(separatorParser)] (Input input) -> parse_result {
+    return [elementParser = std::forward<ElementParser>(elementParser), separatorParser = std::forward<SeparatorParser>(separatorParser)] (Input input) -> parse_result {
         cvector<parser_result_t<ElementParser>, MAX_REPETITIONS> result;
         auto element_result = elementParser(input);
         while(element_result.is_success()) {
@@ -29,13 +28,11 @@ constexpr auto repsep(ElementParser elementParser, SeparatorParser separatorPars
     };
 }
 
-// TODO Test this moves parser correctly (i.e. works with movable-only and also count number of moves/copies)
 template<size_t MAX_REPETITIONS = 1024, class Parser>
 constexpr auto rep(Parser parser) {
     return repsep(std::move(parser), success());
 }
 
-// TODO Test this moves parser correctly (i.e. works with movable-only and also count number of moves/copies)
 template<size_t MAX_REPETITIONS = 1024, class Parser>
 constexpr auto rep1(Parser parser) {
     using parse_result = ParseResult<cvector<parser_result_t<Parser>, MAX_REPETITIONS>>;

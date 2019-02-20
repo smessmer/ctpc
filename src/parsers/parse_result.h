@@ -9,6 +9,7 @@ namespace ctpc {
 // TODO Add test cases for ParseResult
 // TODO Add test cases to all combined parsers for how they handle ERROR state
 // TODO Add error messages
+// TODO For all parsers: Test mutable only results, and also count copying&moving of the result
 
 
 // TODO templatize char away?
@@ -24,7 +25,7 @@ struct Input final {
 enum class ResultStatus : uint8_t {SUCCESS, FAILURE, ERROR};
 
 template<class T>
-struct ParseResult final {
+class ParseResult final {
 public:
     using result_type = T;
 
@@ -38,6 +39,15 @@ public:
 
     static constexpr ParseResult error(Input next) {
         return ParseResult(std::nullopt, next, ResultStatus::ERROR);
+    }
+
+    template<class U> static constexpr std::enable_if_t<std::is_convertible_v<U, T>, ParseResult>
+    convert_from(ParseResult<U> source) {
+        if (source.result_.has_value()) {
+            return ParseResult(std::move(*source.result_), source.next_, source.status_);
+        } else {
+            return ParseResult(std::nullopt, source.next_, source.status_);
+        }
     }
 
     constexpr const T& result() const & {
@@ -68,9 +78,20 @@ public:
         return next_;
     }
 
+    template<class MapFunction>
+    constexpr auto map(MapFunction&& mapper) && {
+        using result_type = decltype(std::forward<MapFunction>(mapper)(*result_));
+        switch(status_) {
+            case ResultStatus::SUCCESS: return ParseResult<result_type>::success(std::forward<MapFunction>(mapper)(std::move(*result_)), next_);
+            case ResultStatus::FAILURE: return ParseResult<result_type>::failure(next_);
+            case ResultStatus::ERROR: return ParseResult<result_type>::error(next_);
+        }
+    }
+
 private:
     constexpr ParseResult(std::optional<T> result, Input next, ResultStatus status)
             : result_(std::move(result)), next_(std::move(next)), status_(std::move(status)) {}
+    template<class U> friend class ParseResult;
 
     std::optional<T> result_;
     Input next_;

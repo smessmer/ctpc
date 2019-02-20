@@ -4,34 +4,31 @@
 
 namespace ctpc {
 
-// TODO Test that this moves/copies parser/mapFunction correctly (i.e. works with movable-only and also count number of moves/copies)
 template<class Parser, class MapFunction>
-constexpr auto flatMap(Parser parser, MapFunction mapFunction) {
-    using result_type = typename decltype(std::declval<MapFunction>()(std::declval<ParseResult<parser_result_t<Parser>>>()))::result_type;
-    return [parser = std::move(parser), mapFunction = std::move(mapFunction)] (Input input) -> ParseResult<result_type> {
-        auto result = parser(input);
-        return mapFunction(result);
+constexpr auto flatMap(Parser&& parser, MapFunction&& mapFunction) {
+    using result_type = typename decltype(mapFunction(std::declval<ParseResult<parser_result_t<Parser>>>()))::result_type;
+    return [parser = std::forward<Parser>(parser), mapFunction = std::forward<MapFunction>(mapFunction)] (Input input) -> ParseResult<result_type> {
+        return mapFunction(parser(input));
     };
 }
 
-// TODO Here (and other parsers) test movable only mapFunction (i.e. works with movable-only and also count number of moves/copies)
 template<class Parser, class MapFunction>
-constexpr auto map(Parser parser, MapFunction mapFunction) {
-    using result_type = decltype(std::declval<MapFunction>()(std::declval<parser_result_t<Parser>>()));
-    return flatMap(std::move(parser), [mapFunction = std::move(mapFunction)] (auto parsed) -> ParseResult<result_type> {
-        if (parsed.is_success()) {
-            return ParseResult<result_type>::success(mapFunction(parsed.result()), parsed.next());
-        } else {
-            return ParseResult<result_type>::failure(parsed.next());
-        }
-    });
+constexpr auto map(Parser&& parser, MapFunction&& mapFunction) {
+    // This could be implemented using flatMap() and a function wrapping the result, but that'd need
+    // to move the mapFunction one more time. We take a different approach to avoid that move.
+    using result_type = decltype(mapFunction(std::declval<parser_result_t<Parser>>()));
+    return [parser = std::forward<Parser>(parser), mapFunction = std::forward<MapFunction>(mapFunction)] (Input input) -> ParseResult<result_type> {
+        return parser(input).map(mapFunction);
+    };
 }
 
-// TODO Here (and other parsers) test movable only parsers (i.e. works with movable-only and also count number of moves/copies)
-// TODO Here (and other parsers) test movable only result (i.e. works with movable-only and also count number of moves/copies)
 template<class Result, class Parser>
-constexpr auto mapValue(Parser parser, Result value) {
-    return map(std::move(parser), [value = std::move(value)] (auto) {return value;});
+constexpr auto mapValue(Parser&& parser, Result&& value) {
+    // This could be implemented using map() and a function always returning a constant, but that'd need
+    // to move the value one more time. We take a different approach to avoid that move.
+    return [parser = std::forward<Parser>(parser), value = std::forward<Result>(value)] (Input input) -> ParseResult<std::decay_t<Result>> {
+        return parser(input).map([&] (auto) {return value;});
+    };
 }
 
 }

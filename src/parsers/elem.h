@@ -5,9 +5,8 @@
 namespace ctpc {
 
 template<class MatchFunction>
-// TODO Test that this moves/copies MatchFunction correctly (i.e. works with movable-only and also count number of moves/copies)
-constexpr auto elem(MatchFunction match) {
-    return [match = std::move(match)] (Input input) -> ParseResult<char> {
+constexpr auto elem(MatchFunction&& match) {
+    return [match = std::forward<MatchFunction>(match)] (Input input) -> ParseResult<char> {
         if (input.input.size() == 0) {
             return ParseResult<char>::failure(input);
         } else if (match(input.input[0])) {

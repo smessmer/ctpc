@@ -10,14 +10,11 @@ namespace details {
         ParseResult<std::tuple<Results...>> results;
     };
 
-    // TODO Test tuple_append
-    // TODO Test forwarding
     template<class NextElem, class... PreviousElems, size_t... indices>
     constexpr std::tuple<PreviousElems..., NextElem> tuple_append(std::tuple<PreviousElems...>&& prev, NextElem&& next, std::index_sequence<indices...>) {
         return std::tuple<PreviousElems..., NextElem>{std::get<indices>(std::move(prev))..., std::forward<NextElem>(next)};
     }
 
-    // TODO Test forwarding and stuff (i.e. how often is copy/move called) for operator<<.
     template<class NextParser, class... PreviousResults>
     constexpr seq_accumulator<PreviousResults..., parser_result_t<NextParser>> operator<<(
             seq_accumulator<PreviousResults...>&& previous_results, const NextParser& nextParser) {
@@ -36,13 +33,13 @@ namespace details {
     }
 }
 
-// TODO Test this (and other) parsers for movable-only result types (i.e. works with movable-only and also count number of moves/copies)
 template<class... Parsers>
-constexpr auto seq(Parsers... parsers) {
+constexpr auto seq(Parsers&&... parsers) {
     using result_type = std::tuple<parser_result_t<Parsers>...>;
-    // TODO Move parsers
-    return [parsers...] (Input input) -> ParseResult<result_type> {
-        return (details::seq_accumulator<>{ParseResult<std::tuple<>>::success(std::tuple<>(), input)} << ... << parsers).results;
+    return [parsers = std::make_tuple(std::forward<Parsers>(parsers)...)] (Input input) -> ParseResult<result_type> {
+        return std::apply([input] (const auto&... parsers) {
+            return (details::seq_accumulator<>{ParseResult<std::tuple<>>::success(std::tuple<>(), input)} << ... << parsers).results;
+        }, parsers);
     };
 }
 

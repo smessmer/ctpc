@@ -17,14 +17,14 @@ namespace details {
 
     template<class Result, class Parser>
     constexpr alternative_accumulator<Result> operator<<(
-            alternative_accumulator<Result>&& previous_result, Parser nextParser) {
+            alternative_accumulator<Result>&& previous_result, const Parser& nextParser) {
         static_assert(std::is_convertible_v<parser_result_t<Parser>, Result>, "This shouldn't happen bebcause Result is the common_type of all individual parser results");
         if (previous_result.firstSuccessOrErrorOrFailureWithLongestMatch.is_failure()) {
             auto parsed = nextParser(previous_result.initialInput);
             if (!parsed.is_failure() || parsed.next().input.size() < previous_result.firstSuccessOrErrorOrFailureWithLongestMatch.next().input.size()) {
                 // the current parser was either successful, threw a fatal error, or was a failure with a longer match.
                 // we want to store it in firstSuccessOrErrorOrFailureWithLongestMatch.
-                return alternative_accumulator<Result>{previous_result.initialInput, std::move(parsed)};
+                return alternative_accumulator<Result>{previous_result.initialInput, ParseResult<Result>::convert_from(std::move(parsed))};
             } else {
                 // the current parser was a failure but with a shorter match.
                 // we want to keep firstSuccessOrErrorOrFailureWithLongestMatch from the previous, longer match
@@ -37,13 +37,13 @@ namespace details {
     }
 }
 
-// TODO Test this moves correctly (i.e. works with movable-only and also count number of moves/copies)
 template<class... Parsers>
-constexpr auto alternative(Parsers... parsers) {
+constexpr auto alternative(Parsers&&... parsers) {
     using result_type = std::common_type_t<parser_result_t<Parsers>...>;
-    // TODO We should move in the parsers
-    return [parsers...] (Input input) -> ParseResult<result_type> {
-        return (details::alternative_accumulator<result_type>{input, ParseResult<result_type>::failure(input)} << ... << parsers).firstSuccessOrErrorOrFailureWithLongestMatch;
+    return [parsers = std::make_tuple(std::forward<Parsers>(parsers)...)] (Input input) -> ParseResult<result_type> {
+        return std::apply([input] (const auto&... parsers) {
+            return (details::alternative_accumulator<result_type>{input, ParseResult<result_type>::failure(input)} << ... << parsers).firstSuccessOrErrorOrFailureWithLongestMatch;
+        }, parsers);
     };
 }
 template<>

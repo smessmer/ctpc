@@ -1,6 +1,8 @@
 #include "parsers/rep.h"
 #include "parsers/string.h"
 #include "parsers/integer.h"
+#include "testutils/move_helpers.h"
+#include <gtest/gtest.h>
 
 using namespace ctpc;
 
@@ -145,6 +147,57 @@ namespace test_rep1_three {
     static_assert(parsed.result()[1] == "Elem");
     static_assert(parsed.result()[2] == "Elem");
     static_assert(parsed.next().input == "ElText"); // doesn't parse last 'El' even though that partly matches, because it's not a failure result.
+}
+
+namespace test_repsep_movableonly_none {
+    constexpr auto parsed = repsep(movable_only(string("Elem")), movable_only(string("Sep")))(Input{"El"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result().size() == 0);
+    static_assert(parsed.next().input == "El");
+}
+namespace test_repsep_movableonly_two {
+    constexpr auto parsed = repsep(movable_only(integer()), movable_only(string("Sep")))(Input{"23Sep39Text"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result().size() == 2);
+    static_assert(parsed.result()[0] == 23);
+    static_assert(parsed.result()[1] == 39);
+    static_assert(parsed.next().input == "Text");
+}
+namespace test_rep_movableonly_none {
+    constexpr auto parsed = rep(movable_only(string("Elem")))(Input{"El"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result().size() == 0);
+    static_assert(parsed.next().input == "El");
+}
+namespace test_rep_movableonly_two {
+    constexpr auto parsed = rep(movable_only(string("Elem")))(Input{"ElemElemElText"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result().size() == 2);
+    static_assert(parsed.result()[0] == "Elem");
+    static_assert(parsed.result()[1] == "Elem");
+    static_assert(parsed.next().input == "ElText"); // doesn't parse last 'El' even though that partly matches, because it's not a failure result.
+}
+namespace test_rep1_movableonly_none {
+    constexpr auto parsed = rep1(movable_only(string("Elem")))(Input{"ElAb"});
+    static_assert(!parsed.is_success());
+    static_assert(parsed.next().input == "ElAb"); // TODO Should this be "Ab" instead? Check Scala parser combinators.
+}
+namespace test_rep1_movableonly_two {
+    constexpr auto parsed = rep1(movable_only(string("Elem")))(Input{"ElemElemElText"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result().size() == 2);
+    static_assert(parsed.result()[0] == "Elem");
+    static_assert(parsed.result()[1] == "Elem");
+    static_assert(parsed.next().input == "ElText"); // doesn't parse last 'El' even though that partly matches, because it's not a failure result.
+}
+
+TEST(RepSepParserTest, doesntCopyOrMoveMoreThanAbsolutelyNecessary) {
+    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
+            [] (auto&&... args) {return repsep(std::forward<decltype(args)>(args)...); },
+            {ctpc::Input{""}, ctpc::Input{"Found,Found"}, ctpc::Input{"Found,FoundBla"}, ctpc::Input{"Found,Found,"}, ctpc::Input{"Found,Found,Bla"}},
+            [] () {return string("Found");},
+            [] () {return string(",");}
+    );
 }
 
 }
