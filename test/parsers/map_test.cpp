@@ -12,7 +12,7 @@ namespace {
 namespace test_flatmap_success_to_success {
     constexpr auto parser = flatMap(string("123"), [] (auto parsed) {
         if (parsed.is_success() && parsed.result() == "123") {
-            return ParseResult<long long>::success(123, parsed.next());
+            return ParseResult<long long>::success(parsed.next(), 123);
         } else {
             return ParseResult<long long>::failure(parsed.next());
         }
@@ -28,7 +28,7 @@ namespace test_flatmap_success_to_failure {
         if (parsed.is_success() && parsed.result() == "123") {
             return ParseResult<long long>::failure(Input{"next"});
         } else {
-            return ParseResult<long long>::success(0, parsed.next());
+            return ParseResult<long long>::success(parsed.next(), 0);
         }
     });
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
@@ -41,7 +41,7 @@ namespace test_flatmap_failure_to_success {
         if (parsed.is_success()) {
             return ParseResult<long long>::failure(parsed.next());
         } else {
-            return ParseResult<long long>::success(123, Input{"next"});
+            return ParseResult<long long>::success(Input{"next"}, 123);
         }
     });
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
@@ -53,7 +53,7 @@ namespace test_flatmap_failure_to_success {
 namespace test_flatmap_failure_to_failure {
     constexpr auto parser = flatMap(string("123"), [] (auto parsed) {
         if (parsed.is_success()) {
-            return ParseResult<long long>::success(0, parsed.next());
+            return ParseResult<long long>::success(parsed.next(), 0);
         } else {
             return ParseResult<long long>::failure(Input{"next"});
         }
@@ -106,7 +106,7 @@ namespace test_mapvalue_failure {
 namespace test_flatmap_movableonly_success_to_success {
     constexpr auto parser = flatMap(movable_only(string("123")), movable_only([] (auto parsed) {
         if (parsed.is_success() && parsed.result() == "123") {
-            return ParseResult<long long>::success(123, parsed.next());
+            return ParseResult<long long>::success(parsed.next(), 123);
         } else {
             return ParseResult<long long>::failure(parsed.next());
         }
@@ -122,7 +122,7 @@ namespace test_flatmap_movableonly_success_to_failure {
         if (parsed.is_success() && parsed.result() == "123") {
             return ParseResult<long long>::failure(Input{"next"});
         } else {
-            return ParseResult<long long>::success(0, parsed.next());
+            return ParseResult<long long>::success(parsed.next(), 0);
         }
     }));
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
@@ -135,7 +135,7 @@ namespace test_flatmap_movableonly_failure_to_success {
         if (parsed.is_success()) {
             return ParseResult<long long>::failure(parsed.next());
         } else {
-            return ParseResult<long long>::success(123, Input{"next"});
+            return ParseResult<long long>::success(Input{"next"}, 123);
         }
     }));
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
@@ -147,7 +147,7 @@ namespace test_flatmap_movableonly_failure_to_success {
 namespace test_flatmap_movableonly_failure_to_failure {
     constexpr auto parser = flatMap(movable_only(string("123")), movable_only([] (auto parsed) {
         if (parsed.is_success()) {
-            return ParseResult<long long>::success(0, parsed.next());
+            return ParseResult<long long>::success(parsed.next(), 0);
         } else {
             return ParseResult<long long>::failure(Input{"next"});
         }
@@ -196,29 +196,29 @@ namespace test_mapvalue_movableonly_failure {
     static_assert(parsed.next().input == "unparseable");
 }
 
-TEST(FlatMapParserTest, doesntCopyOrMoveMoreThanAbsolutelyNecessary) {
-    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
+TEST(FlatMapParserTest, doesntCopyOrMoveParsersMoreThanAbsolutelyNecessary) {
+    testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(
             [] (auto&&... args) {return flatMap(std::forward<decltype(args)>(args)...); },
             {ctpc::Input{""}, ctpc::Input{"FoundBla"}, ctpc::Input{"NotFound"}},
             [] () {return string("Found");},
             [] () {return [] (auto a) {return a;}; }
     );
 
-    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
+    testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(
             [] (auto&&... args) {return flatMap(std::forward<decltype(args)>(args)...); },
             {ctpc::Input{""}, ctpc::Input{"FoundBla"}, ctpc::Input{"NotFound"}},
             [] () {return string("Found");},
-            [] () {return [] (auto a) {return ParseResult<int>::success(3, a.next());}; }
+            [] () {return [] (auto a) {return ParseResult<int>::success(a.next(), 3);}; }
     );
 
-    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
+    testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(
             [] (auto&&... args) {return flatMap(std::forward<decltype(args)>(args)...); },
             {ctpc::Input{""}, ctpc::Input{"FoundBla"}, ctpc::Input{"NotFound"}},
             [] () {return string("Found");},
             [] () {return [] (auto a) {return ParseResult<int>::failure(a.next());}; }
     );
 
-    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
+    testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(
             [] (auto&&... args) {return flatMap(std::forward<decltype(args)>(args)...); },
             {ctpc::Input{""}, ctpc::Input{"FoundBla"}, ctpc::Input{"NotFound"}},
             [] () {return string("Found");},
@@ -226,8 +226,8 @@ TEST(FlatMapParserTest, doesntCopyOrMoveMoreThanAbsolutelyNecessary) {
     );
 }
 
-TEST(MapParserTest, doesntCopyOrMoveMoreThanAbsolutelyNecessary) {
-    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
+TEST(MapParserTest, doesntCopyOrMoveParsersMoreThanAbsolutelyNecessary) {
+    testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(
             [] (auto&&... args) {return map(std::forward<decltype(args)>(args)...); },
             {ctpc::Input{""}, ctpc::Input{"FoundBla"}, ctpc::Input{"NotFound"}},
             [] () {return string("Found");},
@@ -235,96 +235,91 @@ TEST(MapParserTest, doesntCopyOrMoveMoreThanAbsolutelyNecessary) {
     );
 }
 
-/* TODO Use this instead of the MapValueParser_CountCopyAndMove below once perf is fixed
-TEST(MapValueParserTest, doesntCopyOrMoveMoreThanAbsolutelyNecessary) {
-    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
-            [] (auto&&... args) {return mapValue(std::forward<decltype(args)>(args)...); },
+TEST(MapValueParserTest, doesntCopyOrMoveParsersMoreThanAbsolutelyNecessary) {
+    testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(
+            [] (auto&& arg) {return mapValue(std::forward<decltype(arg)>(arg), 5); },
             {ctpc::Input{""}, ctpc::Input{"FoundBla"}, ctpc::Input{"NotFound"}},
-            [] () {return string("Found");},
-            [] () {return 5;}
+            [] () {return string("Found");}
     );
-}*/
-
-TEST(MapValueParser_CountCopyAndMove, constructionFromTemporary) {
-    size_t parser_copy_count = 0, parser_move_count = 0, result_copy_count = 0, result_move_count = 0;
-    auto parser = mapValue(copy_counting(success(), &parser_copy_count, &parser_move_count), copy_counting(5, &result_copy_count, &result_move_count));
-    EXPECT_EQ(0, parser_copy_count);
-    EXPECT_EQ(1, parser_move_count);
-    EXPECT_EQ(0, result_copy_count);
-    EXPECT_EQ(1, result_move_count);
-    (void)(parser); // fix unused parameter warning
 }
 
-TEST(MapValueParser_CountCopyAndMove, constructionFromRvalue) {
-    size_t parser_copy_count = 0, parser_move_count = 0, result_copy_count = 0, result_move_count = 0;
-    copy_counting value(5, &result_copy_count, &result_move_count);
-    copy_counting parser1(success(), &parser_copy_count, &parser_move_count);
-    auto parser = mapValue(std::move(parser1), std::move(value));
-
-    EXPECT_EQ(0, parser_copy_count);
-    EXPECT_EQ(1, parser_move_count);
-    EXPECT_EQ(0, result_copy_count);
-    EXPECT_EQ(1, result_move_count);
-    (void)(parser); // fix unused parameter warning
+namespace test_flatmap_works_with_movable_only_result_success {
+    constexpr auto parsed = flatMap(success_parser_with_movableonly_result(), [] (auto res) {return res;})(Input{"input"});
+    static_assert(parsed.is_success());
 }
 
-TEST(MapValueParser_CountCopyAndMove, constructionFromLvalue) {
-    size_t parser_copy_count = 0, parser_move_count = 0, result_copy_count = 0, result_move_count = 0;
-    copy_counting value(5, &result_copy_count, &result_move_count);
-    copy_counting parser1(success(), &parser_copy_count, &parser_move_count);
-    auto parser = mapValue(parser1, value);
-
-    EXPECT_EQ(1, parser_copy_count);
-    EXPECT_EQ(0, parser_move_count);
-    EXPECT_EQ(1, result_copy_count);
-    EXPECT_EQ(0, result_move_count);
-    (void)(parser); // fix unused parameter warning
+namespace test_flatmap_works_with_movable_only_result_failure {
+    constexpr auto parsed = flatMap(failure_parser_with_movableonly_result(), [] (auto res) {return res;})(Input{"input"});
+    static_assert(parsed.is_failure());
 }
 
-TEST(MapValueParser_CountCopyAndMove, calling) {
-    size_t parser_copy_count = 0, parser_move_count = 0, result_copy_count = 0, result_move_count = 0;
-    auto parser = mapValue(copy_counting(elem('a'), &parser_copy_count, &parser_move_count), copy_counting(5, &result_copy_count, &result_move_count));
-    parser_copy_count = parser_move_count = result_copy_count = result_move_count = 0;
+TEST(FlatMapParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary_newobjects) {
+    size_t copy_count = 0, move_count = 0;
+    auto parsed = flatMap(success_parser_with_copycounting_result(&copy_count, &move_count), [&] (auto res) {
+        return ParseResult<copy_counting<double>>::success(res.next(), 4, &copy_count, &move_count);
+    })(Input{"input"});
 
-    // calling success case doesn't copy or move
-    auto parsed = parser(Input{"a"});
     EXPECT_TRUE(parsed.is_success());
-    EXPECT_EQ(0, parser_copy_count);
-    EXPECT_EQ(0, parser_move_count);
-    EXPECT_EQ(2, result_copy_count); // TODO Why not 1? Optimize!
-    EXPECT_EQ(1, result_move_count); // TODO Why not 0? Optimize!
-
-    // calling failure case doesn't copy or move
-    parsed = parser(Input{"b"});
-    EXPECT_TRUE(parsed.is_failure());
-    EXPECT_EQ(0, parser_copy_count);
-    EXPECT_EQ(0, parser_move_count);
-    EXPECT_EQ(2, result_copy_count); // TODO Why not 0? Optimize!
-    EXPECT_EQ(1, result_move_count); // TODO Why not 0? Optimize!
+    EXPECT_EQ(0, copy_count);
+    EXPECT_EQ(0, move_count);
 }
 
-TEST(MapValueParser_CountCopyAndMove, copying) {
-    size_t parser_copy_count = 0, parser_move_count = 0, result_copy_count = 0, result_move_count = 0;
-    auto parser = mapValue(copy_counting(elem('a'), &parser_copy_count, &parser_move_count), copy_counting(5, &result_copy_count, &result_move_count));
-    parser_copy_count = parser_move_count = result_copy_count = result_move_count = 0;
+TEST(FlatMapParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary_passthrough) {
+    size_t copy_count = 0, move_count = 0;
+    auto parsed = flatMap(success_parser_with_copycounting_result(&copy_count, &move_count), [] (auto res) {return res;})(Input{"input"});
 
-    auto copy = parser;
-    EXPECT_EQ(1, parser_copy_count);
-    EXPECT_EQ(0, parser_move_count);
-    EXPECT_EQ(1, result_copy_count);
-    EXPECT_EQ(0, result_move_count);
+    EXPECT_TRUE(parsed.is_success());
+    EXPECT_EQ(0, copy_count);
+    EXPECT_EQ(1, move_count);
 }
 
-TEST(MapValueParser_CountCopyAndMove, moving) {
-    size_t parser_copy_count = 0, parser_move_count = 0, result_copy_count = 0, result_move_count = 0;
-    auto parser = mapValue(copy_counting(elem('a'), &parser_copy_count, &parser_move_count), copy_counting(5, &result_copy_count, &result_move_count));
-    parser_copy_count = parser_move_count = result_copy_count = result_move_count = 0;
+namespace test_map_works_with_movable_only_result_success {
+    constexpr auto parsed = map(success_parser_with_movableonly_result(), [] (auto res) {return res;})(Input{"input"});
+    static_assert(parsed.is_success());
+}
 
-    auto copy = std::move(parser);
-    EXPECT_EQ(0, parser_copy_count);
-    EXPECT_EQ(1, parser_move_count);
-    EXPECT_EQ(0, result_copy_count);
-    EXPECT_EQ(1, result_move_count);
+namespace test_map_works_with_movable_only_result_failure {
+    constexpr auto parsed = map(failure_parser_with_movableonly_result(), [] (auto res) {return res;})(Input{"input"});
+    static_assert(parsed.is_failure());
+}
+
+TEST(MapParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary_newobjects) {
+    size_t copy_count_1 = 0, move_count_1 = 0, copy_count_2 = 0, move_count_2 = 0;
+    auto parsed = map(success_parser_with_copycounting_result(&copy_count_1, &move_count_1), [&] (auto&&) {
+        return copy_counting<double>(4, &copy_count_2, &move_count_2);
+    })(Input{"input"});
+
+    EXPECT_TRUE(parsed.is_success());
+    EXPECT_EQ(0, copy_count_1);
+    EXPECT_EQ(0, move_count_1);
+    EXPECT_EQ(0, copy_count_2);
+    EXPECT_EQ(1, move_count_2); // TODO Why does this need to be moved?
+}
+
+TEST(MapParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary_passthrough) {
+    size_t copy_count = 0, move_count = 0;
+    auto parsed = map(success_parser_with_copycounting_result(&copy_count, &move_count), [] (auto&& res) {return std::move(res);})(Input{"input"});
+
+    EXPECT_TRUE(parsed.is_success());
+    EXPECT_EQ(0, copy_count);
+    EXPECT_EQ(2, move_count);
+}
+
+TEST(MapValueParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary) {
+    size_t copy_count_1 = 0, move_count_1 = 0, copy_count_2 = 0, move_count_2 = 0;
+    auto parser = mapValue(success_parser_with_copycounting_result(&copy_count_1, &move_count_1), copy_counting<double>(4, &copy_count_2, &move_count_2));
+    EXPECT_EQ(0, copy_count_1);
+    EXPECT_EQ(0, move_count_1);
+    EXPECT_EQ(0, copy_count_2);
+    EXPECT_EQ(1, move_count_2);
+
+    auto parsed = parser(Input{"input"});
+
+    EXPECT_TRUE(parsed.is_success());
+    EXPECT_EQ(0, copy_count_1);
+    EXPECT_EQ(0, move_count_1);
+    EXPECT_EQ(1, copy_count_2);
+    EXPECT_EQ(1, move_count_2);
 }
 
 }

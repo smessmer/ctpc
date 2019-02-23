@@ -5,40 +5,67 @@
 namespace ctpc {
 
 namespace details {
-    template<class... Results>
-    struct seq_accumulator final {
-        ParseResult<std::tuple<Results...>> results;
+    struct SeqResultStatus final {
+        Input next;
+        ResultStatus status;
     };
 
-    template<class NextElem, class... PreviousElems, size_t... indices>
-    constexpr std::tuple<PreviousElems..., NextElem> tuple_append(std::tuple<PreviousElems...>&& prev, NextElem&& next, std::index_sequence<indices...>) {
-        return std::tuple<PreviousElems..., NextElem>{std::get<indices>(std::move(prev))..., std::forward<NextElem>(next)};
-    }
+    template<class... Parsers> struct apply_seq_parsers final {};
 
-    template<class NextParser, class... PreviousResults>
-    constexpr seq_accumulator<PreviousResults..., parser_result_t<NextParser>> operator<<(
-            seq_accumulator<PreviousResults...>&& previous_results, const NextParser& nextParser) {
-        using result_type = ParseResult<std::tuple<PreviousResults..., parser_result_t<NextParser>>>;
-        using result_accumulator = seq_accumulator<PreviousResults..., parser_result_t<NextParser>>;
-        if (!previous_results.results.is_success()) {
-            return result_accumulator{result_type::failure(previous_results.results.next())};
-        } else {
-            auto parsed = nextParser(previous_results.results.next());
-            if (!parsed.is_success()) {
-                return result_accumulator{result_type::failure(parsed.next())};
-            } else {
-                return result_accumulator{result_type::success(tuple_append(std::move(previous_results.results).result(), std::move(parsed).result(), std::make_index_sequence<sizeof...(PreviousResults)>()), parsed.next())};
+    template<class HeadParser, class... TailParsers>
+    struct apply_seq_parsers<HeadParser, TailParsers...> final {
+        template<size_t current_index, class ResultBuffer>
+        static constexpr SeqResultStatus call(Input input, ResultBuffer* result, const HeadParser& headParser, const TailParsers&... tailParsers) {
+            static_assert(std::tuple_size_v<ResultBuffer> == current_index + 1 + sizeof...(TailParsers));
+            static_assert(std::is_same_v<std::tuple_element_t<current_index, ResultBuffer>, ParseResult<parser_result_t<HeadParser>>>);
+
+            auto& current_result = std::get<current_index>(*result);
+            current_result = headParser(input);
+            if (current_result.is_success()) {
+                return apply_seq_parsers<TailParsers...>::template call<current_index + 1>(current_result.next(), result, tailParsers...);
             }
+
+            return SeqResultStatus { current_result.next(), current_result.status() };
         }
-    }
+    };
+
+    template<>
+    struct apply_seq_parsers<> final {
+        template<size_t current_index, class ResultBuffer>
+        static constexpr SeqResultStatus call(Input input, ResultBuffer* /*result*/) {
+            static_assert(std::tuple_size_v<ResultBuffer> == current_index);
+
+            return SeqResultStatus { input, ResultStatus::SUCCESS };
+        }
+    };
+
 }
 
+// TODO Make seq handle errors (i.e. fatals) in its child parsers correctly and test it
 template<class... Parsers>
 constexpr auto seq(Parsers&&... parsers) {
     using result_type = std::tuple<parser_result_t<Parsers>...>;
     return [parsers = std::make_tuple(std::forward<Parsers>(parsers)...)] (Input input) -> ParseResult<result_type> {
         return std::apply([input] (const auto&... parsers) {
-            return (details::seq_accumulator<>{ParseResult<std::tuple<>>::success(std::tuple<>(), input)} << ... << parsers).results;
+            std::tuple<ParseResult<parser_result_t<Parsers>>...> result_buffer {ParseResult<parser_result_t<Parsers>>::failure(input)...};
+            details::SeqResultStatus status = details::apply_seq_parsers<std::decay_t<Parsers>...>::template call<0>(
+                    input, &result_buffer, parsers...
+            );
+
+            if (status.status == ResultStatus::SUCCESS) {
+                return std::apply([&] (auto&&... results) {
+                    ASSERT((... && results.is_success()));
+                    return ParseResult<result_type>::success(status.next, std::move(results).result()...);
+                }, std::move(result_buffer));
+            }
+
+            if (status.status == ResultStatus::FAILURE) {
+                return ParseResult<result_type>::failure(status.next);
+            }
+
+            ASSERT (status.status == ResultStatus::ERROR);
+            return ParseResult<result_type>::error(status.next);
+
         }, parsers);
     };
 }

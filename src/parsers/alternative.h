@@ -1,40 +1,47 @@
 #pragma once
 
 #include "parsers/parse_result.h"
+#include "parsers/basic_parsers.h"
 
 namespace ctpc {
 
 namespace details {
-    template<class Result>
-    struct alternative_accumulator final {
-        Input initialInput;
+    // TODO Seems the recursive template approach has quite bad codegen for >4 arguments. Figure out an alternative.
 
-        // while trying failing parsers from left to right, this remembers the failure with the longest match.
-        // if a parser returns a success or fatal error, that result will be remembered instead, and
-        // no more parsers will be tried.
-        ParseResult<Result> firstSuccessOrErrorOrFailureWithLongestMatch;
+    template<class Result, class... Parsers> struct apply_alternative_parsers final {};
+
+    template<class Result, class HeadParser, class... TailParsers>
+    struct apply_alternative_parsers<Result, HeadParser, TailParsers...> final {
+        static constexpr ParseResult<Result> call(Input input, ParseResult<Result>&& longest_failure, const HeadParser &headParser, const TailParsers &... tailParsers) {
+            static_assert(std::is_convertible_v<parser_result_t<HeadParser>, Result>, "This shouldn't happen because Result is the common_type of all individual parser results");
+            static_assert(std::is_same_v<Result, std::decay_t<Result>>);
+
+            auto parsed = headParser(input);
+
+            if (!parsed.is_failure()) {
+                // SUCCESS and ERROR end the chain
+                return ParseResult<Result>::unsafe_convert_from(std::move(parsed));
+            }
+
+            // The current parser failed. Try the next in the list.
+
+            if (parsed.next().input.size() < longest_failure.next().input.size()) {
+                // Current failure matched a longer prefix of the input than all previous parsers.
+                // Remember this one as the result in case no parser returns success or error.
+                return apply_alternative_parsers<Result, TailParsers...>::call(input, ParseResult<Result>::unsafe_convert_from(std::move(parsed)), tailParsers...);
+            } else {
+                // A previous parser had a longer match. Keep that.
+                return apply_alternative_parsers<Result, TailParsers...>::call(input, std::move(longest_failure), tailParsers...);
+            }
+        }
     };
 
-    template<class Result, class Parser>
-    constexpr alternative_accumulator<Result> operator<<(
-            alternative_accumulator<Result>&& previous_result, const Parser& nextParser) {
-        static_assert(std::is_convertible_v<parser_result_t<Parser>, Result>, "This shouldn't happen bebcause Result is the common_type of all individual parser results");
-        if (previous_result.firstSuccessOrErrorOrFailureWithLongestMatch.is_failure()) {
-            auto parsed = nextParser(previous_result.initialInput);
-            if (!parsed.is_failure() || parsed.next().input.size() < previous_result.firstSuccessOrErrorOrFailureWithLongestMatch.next().input.size()) {
-                // the current parser was either successful, threw a fatal error, or was a failure with a longer match.
-                // we want to store it in firstSuccessOrErrorOrFailureWithLongestMatch.
-                return alternative_accumulator<Result>{previous_result.initialInput, ParseResult<Result>::convert_from(std::move(parsed))};
-            } else {
-                // the current parser was a failure but with a shorter match.
-                // we want to keep firstSuccessOrErrorOrFailureWithLongestMatch from the previous, longer match
-                return previous_result;
-            }
-        } else {
-            // previous_result was SUCCESS or ERROR
-            return previous_result;
+    template<class Result>
+    struct apply_alternative_parsers<Result> final {
+        static constexpr ParseResult<Result>&& call(Input /*input*/, ParseResult<Result>&& longest_failure) {
+            return std::move(longest_failure);
         }
-    }
+    };
 }
 
 template<class... Parsers>
@@ -42,15 +49,13 @@ constexpr auto alternative(Parsers&&... parsers) {
     using result_type = std::common_type_t<parser_result_t<Parsers>...>;
     return [parsers = std::make_tuple(std::forward<Parsers>(parsers)...)] (Input input) -> ParseResult<result_type> {
         return std::apply([input] (const auto&... parsers) {
-            return (details::alternative_accumulator<result_type>{input, ParseResult<result_type>::failure(input)} << ... << parsers).firstSuccessOrErrorOrFailureWithLongestMatch;
+            return details::apply_alternative_parsers<result_type, std::decay_t<Parsers>...>::call(input, ParseResult<result_type>::failure(input), parsers...);
         }, parsers);
     };
 }
 template<>
 constexpr auto alternative() {
-    return [] (Input input) -> ParseResult<std::nullptr_t> {
-        return ParseResult<std::nullptr_t>::failure(input);
-    };
+    return failure();
 }
 
 }

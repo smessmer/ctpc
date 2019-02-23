@@ -52,8 +52,8 @@ namespace test_elem_fn_movableonly_failure {
     static_assert(parsed.next().input == "bandsometext");
 }
 
-TEST(ElemFnParserTest, doesntCopyOrMoveMoreThanAbsolutelyNecessary) {
-    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
+TEST(ElemFnParserTest, doesntCopyOrMoveFunctionMoreThanAbsolutelyNecessary) {
+    testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(
             [] (auto&& arg) {return elem(std::forward<decltype(arg)>(arg)); },
             {ctpc::Input{""}, ctpc::Input{"abc"}},
             [] () {return [] (char) {return true;}; }

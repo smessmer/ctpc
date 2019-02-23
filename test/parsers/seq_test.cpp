@@ -75,14 +75,66 @@ namespace test_seq_movableonly_failure {
     static_assert(parsed.next().input == "A23FGH");
 }
 
-TEST(SeqParserTest, doesntCopyOrMoveMoreThanAbsolutelyNecessary) {
-    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
+TEST(SeqParserTest, doesntCopyOrMoveParsersMoreThanAbsolutelyNecessary) {
+    testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(
         [] (auto&&... args) {return seq(std::forward<decltype(args)>(args)...); },
         {ctpc::Input{""}, ctpc::Input{"ABCDE"}, ctpc::Input{"ABC_"}, ctpc::Input{"ABCDEF"}},
         [] () {return string("AB");},
         [] () {return string("CD");},
         [] () {return string("EF");}
     );
+}
+
+namespace test_seq_works_with_movable_only_result {
+    constexpr auto parser_with_movable_only_result = map(elem('a'), [] (auto) {return movable_only<int>(3);});
+    constexpr auto parsed = seq(parser_with_movable_only_result)(Input{"aa"});
+    static_assert(parsed.is_success());
+}
+
+TEST(SeqParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary_success) {
+    constexpr auto parser_with_copycounting_result = [](size_t *copy_count, size_t *move_count) {
+        return [=](Input input) {
+            if (input.input.size() > 0) {
+                return ParseResult<copy_counting<int>>::success(Input{input.input.substr(1)}, 3, copy_count, move_count);
+            } else {
+                return ParseResult<copy_counting<int>>::failure(input);
+            }
+        };
+    };
+
+    size_t copy_count_1 = 0, move_count_1 = 0, copy_count_2 = 0, move_count_2 = 0, copy_count_3 = 0, move_count_3 = 0;
+
+    auto parsed = seq(parser_with_copycounting_result(&copy_count_1, &move_count_1), parser_with_copycounting_result(&copy_count_2, &move_count_2), parser_with_copycounting_result(&copy_count_3, &move_count_3))(Input{"aaaa"});
+    EXPECT_TRUE(parsed.is_success());
+    EXPECT_EQ(0, copy_count_1);
+    EXPECT_EQ(2, move_count_1); // Move once when parsed and once when returning the tuple
+    EXPECT_EQ(0, copy_count_2);
+    EXPECT_EQ(2, move_count_2); // Move once when parsed and once when returning the tuple
+    EXPECT_EQ(0, copy_count_3);
+    EXPECT_EQ(2, move_count_3); // Move once when parsed and once when returning the tuple
+}
+
+TEST(SeqParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary_failure) {
+    constexpr auto parser_with_copycounting_result = [](size_t *copy_count, size_t *move_count) {
+        return [=](Input input) {
+            if (input.input.size() > 0) {
+                return ParseResult<copy_counting<int>>::success(Input{input.input.substr(1)}, 3, copy_count, move_count);
+            } else {
+                return ParseResult<copy_counting<int>>::failure(input);
+            }
+        };
+    };
+
+    size_t copy_count_1 = 0, move_count_1 = 0, copy_count_2 = 0, move_count_2 = 0, copy_count_3 = 0, move_count_3 = 0;
+
+    auto parsed = seq(parser_with_copycounting_result(&copy_count_1, &move_count_1), parser_with_copycounting_result(&copy_count_2, &move_count_2), parser_with_copycounting_result(&copy_count_3, &move_count_3))(Input{"a"});
+    EXPECT_TRUE(parsed.is_failure());
+    EXPECT_EQ(0, copy_count_1);
+    EXPECT_EQ(1, move_count_1); // Move once when parsed
+    EXPECT_EQ(0, copy_count_2);
+    EXPECT_EQ(0, move_count_2);
+    EXPECT_EQ(0, copy_count_3);
+    EXPECT_EQ(0, move_count_3);
 }
 
 }

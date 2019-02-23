@@ -124,6 +124,34 @@ namespace test_alternative_works_with_movable_only_parsers_failure {
     static_assert(parsed.next().input == "Three");
 }
 
+TEST(AlternativeParserTest, doesntCopyOrMoveParsersMoreThanAbsolutelyNecessary) {
+    testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(
+            [] (auto&&... args) {return alternative(std::forward<decltype(args)>(args)...); },
+            {ctpc::Input{""}, ctpc::Input{"OnTwoSomeText"}, ctpc::Input{"SomethingElse"}},
+            [] () {return string("One");},
+            [] () {return string("OnTwo");},
+            [] () {return string("OnThree");}
+    );
+}
+
+namespace test_alternative_works_with_movable_only_result_success {
+    constexpr auto parsed = alternative(failure_parser_with_movableonly_result(), success_parser_with_movableonly_result(), success_parser_with_movableonly_result())(Input{"input"});
+    static_assert(parsed.is_success());
+}
+
+namespace test_alternative_works_with_movable_only_result_failure {
+    constexpr auto parsed = alternative(failure_parser_with_movableonly_result(), failure_parser_with_movableonly_result(), failure_parser_with_movableonly_result())(Input{"input"});
+    static_assert(!parsed.is_success());
+}
+
+TEST(AlternativeParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary) {
+    size_t copy_count = 0, move_count = 0;
+    auto parsed = alternative(failure_parser_with_copycounting_result(), success_parser_with_copycounting_result(&copy_count, &move_count), success_parser_with_copycounting_result(&copy_count, &move_count))(Input{"input"});
+    EXPECT_TRUE(parsed.is_success());
+    EXPECT_EQ(0, copy_count);
+    EXPECT_EQ(1, move_count); // TODO Can this be further optimized?
+}
+
 namespace test_alternative_works_with_convertible_types_intdouble {
     constexpr auto int_parser = mapValue<int>(elem('a'), int(1));
     constexpr auto double_parser = mapValue<double>(elem('b'), double(2));
@@ -154,16 +182,6 @@ namespace test_alternative_works_with_convertible_types_doubleintfloat {
     constexpr auto parsed2_3 = parser2(Input{"c"}).result();
     static_assert(std::is_same_v<const double, decltype(parsed2_3)>);
     static_assert(3 == parsed2_3);
-}
-
-TEST(AlternativeParserTest, doesntCopyOrMoveMoreThanAbsolutelyNecessary) {
-    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
-            [] (auto&&... args) {return alternative(std::forward<decltype(args)>(args)...); },
-            {ctpc::Input{""}, ctpc::Input{"OnTwoSomeText"}, ctpc::Input{"SomethingElse"}},
-            [] () {return string("One");},
-            [] () {return string("OnTwo");},
-            [] () {return string("OnThree");}
-    );
 }
 
 }

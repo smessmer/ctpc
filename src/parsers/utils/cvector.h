@@ -2,6 +2,7 @@
 
 #include <array>
 #include <vector>
+#include "assert.h"
 
 namespace ctpc {
 
@@ -17,13 +18,19 @@ namespace ctpc {
      * However, it's better to verify that in your concrete use case since it's easy to make a mistake and accidentally
      * access the cvector at runtime, in which case suddenly it does exist at runtime.
      */
+     // TODO Can I make this work without requiring T to have a default constructor?
     template<class T, size_t MAX_SIZE>
     class cvector final {
     public:
-        using element_type = T;
+        using value_type = T;
 
         constexpr explicit cvector()
         : elements_(), size_(0) {}
+
+        constexpr cvector(cvector&&) = default;
+        constexpr cvector(const cvector&) = default;
+        constexpr cvector& operator=(cvector&&) = default;
+        constexpr cvector& operator=(const cvector&) = default;
 
         constexpr explicit cvector(std::initializer_list<T> elements)
         : elements_(), size_(elements.size()) {
@@ -51,6 +58,11 @@ namespace ctpc {
             return const_cast<T&>(const_cast<const cvector*>(this)->get_unsafe(index));
         }
 
+        // TODO Test back
+        constexpr T& back() {
+            return *(end()-1);
+        }
+
         constexpr const T* begin() const {
             return elements_.begin();
         }
@@ -71,13 +83,26 @@ namespace ctpc {
             return size_;
         }
 
-        constexpr void push_back(T elem) {
+        template<class U>
+        constexpr void push_back(U&& elem) {
+            static_assert(std::is_convertible_v<U, T>, "Wrong argument type for cvector::push_back");
             if (size_ == elements_.size()) {
                 throw std::runtime_error("No capacity left");
             }
 
-            elements_[size_] = std::move(elem);
+            elements_[size_] = std::forward<U>(elem);
             ++size_;
+        }
+
+        constexpr void reserve(size_t capacity) {
+            ASSERT(capacity <= MAX_SIZE); // Capacity can't grow above compile time capacity
+            // reserve() is basically a no-op because we have a fixed compile-time capacity.
+        }
+
+        // TODO Test pop_back()
+        constexpr void pop_back() {
+            --size_;
+            elements_[size_] = T();
         }
 
     private:
@@ -87,14 +112,14 @@ namespace ctpc {
 
     namespace detail {
         template<class CVEC, size_t... indices>
-        inline std::vector<typename CVEC::element_type>
+        inline std::vector<typename CVEC::value_type>
         _cvector_to_vector(const CVEC &vec, std::index_sequence<indices...>) {
             return {vec.get_unsafe(indices)...};
         }
     }
 
     template<size_t SIZE, class CVEC>
-    inline std::vector<typename CVEC::element_type> cvector_to_vector(const CVEC &vec) {
+    inline std::vector<typename CVEC::value_type> cvector_to_vector(const CVEC &vec) {
         assert(SIZE == vec.size());
         return detail::_cvector_to_vector(vec, std::make_index_sequence<SIZE>());
     }

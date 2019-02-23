@@ -7,6 +7,9 @@
 template<class Parser>
 class movable_only final {
 public:
+    // TODO Remove default constructor once not needed by cvector anymore
+    constexpr explicit movable_only(): _parser() {}
+
     constexpr explicit movable_only(Parser parser)
     : _parser(std::move(parser)) {}
 
@@ -27,6 +30,9 @@ private:
 template<class Parser>
 class copy_counting final {
 public:
+    // TODO Remove default constructor once not needed by cvector anymore
+    constexpr explicit copy_counting(): _copy_counter(nullptr), _move_counter(nullptr), _parser() {}
+
     constexpr explicit copy_counting(Parser parser, size_t* copy_counter, size_t* move_counter)
     : _copy_counter(copy_counter), _move_counter(move_counter), _parser(std::move(parser)) {}
 
@@ -37,27 +43,35 @@ public:
 
     constexpr copy_counting(const copy_counting& rhs)
     : _copy_counter(rhs._copy_counter), _move_counter(rhs._move_counter), _parser(rhs._parser) {
-        ++*_copy_counter;
+        if (nullptr != _copy_counter) {
+            ++*_copy_counter;
+        }
     }
 
     constexpr copy_counting& operator=(const copy_counting& rhs) {
         _copy_counter = rhs._copy_counter;
         _move_counter = rhs._move_counter;
         _parser = rhs._parser;
-        ++*_copy_counter;
+        if (nullptr != _copy_counter) {
+            ++*_copy_counter;
+        }
         return *this;
     }
 
     constexpr copy_counting(copy_counting&& rhs) noexcept
     : _copy_counter(rhs._copy_counter), _move_counter(rhs._move_counter), _parser(std::move(rhs._parser)) {
-        ++*_move_counter;
+        if (nullptr != _move_counter) {
+            ++*_move_counter;
+        }
     }
 
     constexpr copy_counting& operator=(copy_counting&& rhs) noexcept {
         _copy_counter = rhs._copy_counter;
         _move_counter = rhs._move_counter;
         _parser = std::move(rhs._parser);
-        ++*_move_counter;
+        if (nullptr != _move_counter) {
+            ++*_move_counter;
+        }
         return *this;
     }
 
@@ -69,9 +83,9 @@ private:
 
 
 template<class ParentParserCreator, class... ChildParserCreators>
-class TestDoesntCopyOrMoveMoreThanAbsolutelyNecessary final {
+class TestDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary final {
 public:
-    explicit TestDoesntCopyOrMoveMoreThanAbsolutelyNecessary(ParentParserCreator parentCreator, std::vector<ctpc::Input> callingInputs, ChildParserCreators... childCreators)
+    explicit TestDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(ParentParserCreator parentCreator, std::vector<ctpc::Input> callingInputs, ChildParserCreators... childCreators)
     : _parentCreator(std::move(parentCreator)), _childCreators(std::make_tuple(std::move(childCreators)...)), _callingInputs(std::move(callingInputs)) {}
 
     void runTest() {
@@ -187,8 +201,32 @@ private:
 };
 
 template<class ParentParserCreator, class... ChildParserCreators>
-inline void testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(ParentParserCreator parentCreator, std::vector<ctpc::Input> callingInputs, ChildParserCreators... childCreators) {
-    TestDoesntCopyOrMoveMoreThanAbsolutelyNecessary<ParentParserCreator, ChildParserCreators...>(
+inline void testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(ParentParserCreator parentCreator, std::vector<ctpc::Input> callingInputs, ChildParserCreators... childCreators) {
+    TestDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary<ParentParserCreator, ChildParserCreators...>(
         std::move(parentCreator), std::move(callingInputs), std::move(childCreators)...
     ).runTest();
+}
+
+constexpr auto failure_parser_with_movableonly_result() {
+    return [] (ctpc::Input input) {
+        return ctpc::ParseResult<movable_only<int>>::failure(input);
+    };
+}
+
+constexpr auto success_parser_with_movableonly_result() {
+    return [] (ctpc::Input input) {
+        return ctpc::ParseResult<movable_only<int>>::success(input, movable_only<int>(3));
+    };
+}
+
+constexpr auto success_parser_with_copycounting_result(size_t* copy_count, size_t* move_count) {
+    return [copy_count, move_count] (ctpc::Input input) {
+        return ctpc::ParseResult<copy_counting<int>>::success(input, 3, copy_count, move_count);
+    };
+}
+
+constexpr auto failure_parser_with_copycounting_result() {
+    return [] (ctpc::Input input) {
+        return ctpc::ParseResult<copy_counting<int>>::failure(input);
+    };
 }

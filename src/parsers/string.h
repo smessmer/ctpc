@@ -14,7 +14,7 @@ constexpr auto string(std::string_view expected) {
                 return ParseResult<std::string_view>::failure(Input{input.input.substr(i)});
             }
         }
-        return ParseResult<std::string_view>::success(input.input.substr(0, i), Input{input.input.substr(i)});
+        return ParseResult<std::string_view>::success(Input{input.input.substr(i)}, input.input.substr(0, i));
     };
 }
 

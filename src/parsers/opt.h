@@ -10,9 +10,10 @@ constexpr auto opt(Parser&& parser) {
     return [parser = std::forward<Parser>(parser)] (Input input) -> parse_result {
         auto parsed = parser(input);
         if (parsed.is_success()) {
-            return parse_result::success(parsed.result(), parsed.next());
+            Input next = parsed.next();
+            return parse_result::success(next, std::move(parsed).result());
         } else {
-            return parse_result::success(std::nullopt, input);
+            return parse_result::success(input, std::nullopt);
         }
     };
 }

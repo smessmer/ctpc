@@ -27,7 +27,7 @@ constexpr auto mapValue(Parser&& parser, Result&& value) {
     // This could be implemented using map() and a function always returning a constant, but that'd need
     // to move the value one more time. We take a different approach to avoid that move.
     return [parser = std::forward<Parser>(parser), value = std::forward<Result>(value)] (Input input) -> ParseResult<std::decay_t<Result>> {
-        return parser(input).map([&] (auto) {return value;});
+        return parser(input).mapValue(value);
     };
 }
 

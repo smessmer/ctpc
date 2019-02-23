@@ -33,9 +33,9 @@ constexpr bool true_for_each_index(Condition&& condition, std::index_sequence<in
     return (condition(indices) && ...);
 }
 
-namespace element_type_test {
-  static_assert(std::is_same_v<int, cvector<int, 1024>::element_type>);
-  static_assert(std::is_same_v<double, cvector<double, 1024>::element_type>);
+namespace value_type_test {
+  static_assert(std::is_same_v<int, cvector<int, 1024>::value_type>);
+  static_assert(std::is_same_v<double, cvector<double, 1024>::value_type>);
 }
 
 namespace size_test {

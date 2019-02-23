@@ -6,7 +6,7 @@ namespace ctpc {
 
 constexpr auto success() {
     return [] (Input input) -> ParseResult<std::nullptr_t> {
-        return ParseResult<std::nullptr_t>::success(nullptr, input);
+        return ParseResult<std::nullptr_t>::success(input, nullptr);
     };
 }
 

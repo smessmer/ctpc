@@ -16,23 +16,20 @@ constexpr auto numeric() {
 constexpr auto digit() {
     return map(
             numeric(),
-            [] (char digit) {
+            [] (char digit) -> uint8_t {
                 return digit - '0';
             }
     );
 }
 
 constexpr auto integer() {
-    return map(
-            rep1(digit()),
-            [] (auto digits) {
-                long long result = 0;
-                for (auto digit : digits) {
-                    result *= 10;
-                    result += digit;
-                }
-                return result;
-            }
+    return rep1(
+        digit(),
+        [] () -> int64_t {return 0;},
+        [] (int64_t* accumulator, uint8_t digit) {
+            *accumulator *= 10;
+            *accumulator += digit;
+        }
     );
 }
 

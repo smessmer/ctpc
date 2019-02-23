@@ -33,12 +33,30 @@ namespace test_opt_movableonly_failure {
     static_assert(parsed.next().input == "FoSomethingElse");
 }
 
-TEST(OptParserTest, doesntCopyOrMoveMoreThanAbsolutelyNecessary) {
-    testDoesntCopyOrMoveMoreThanAbsolutelyNecessary(
+TEST(OptParserTest, doesntCopyOrMoveParsersMoreThanAbsolutelyNecessary) {
+    testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(
             [] (auto&& arg) {return opt(std::forward<decltype(arg)>(arg)); },
             {ctpc::Input{""}, ctpc::Input{"FoundBla"}, ctpc::Input{"NotFound"}},
             [] () {return string("Found");}
     );
+}
+
+namespace test_opt_works_with_movable_only_result_failure {
+    constexpr auto parsed = opt(failure_parser_with_movableonly_result())(Input{"input"});
+    static_assert(parsed.is_success());
+}
+
+namespace test_opt_works_with_movable_only_result_success {
+    constexpr auto parsed = opt(success_parser_with_movableonly_result())(Input{"input"});
+    static_assert(parsed.is_success());
+}
+
+TEST(OptParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary) {
+    size_t copy_count = 0, move_count = 0;
+    auto parsed = opt(success_parser_with_copycounting_result(&copy_count, &move_count))(Input{"input"});
+    EXPECT_TRUE(parsed.is_success());
+    EXPECT_EQ(0, copy_count);
+    EXPECT_EQ(1, move_count);
 }
 
 }
