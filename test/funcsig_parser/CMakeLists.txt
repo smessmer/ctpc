@@ -2,6 +2,7 @@ project(funcsig-parser-test)
 
 set(SOURCES
     identifier_test.cpp
+    parameter_test.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})
