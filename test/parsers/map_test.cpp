@@ -3,6 +3,7 @@
 #include "parsers/basic_parsers.h"
 #include "parsers/elem.h"
 #include "testutils/move_helpers.h"
+#include "testutils/error_parser.h"
 #include <gtest/gtest.h>
 
 using namespace ctpc;
@@ -28,20 +29,33 @@ namespace test_flatmap_success_to_failure {
         if (parsed.is_success() && parsed.result() == "123") {
             return ParseResult<long long>::failure(Input{"next"});
         } else {
-            return ParseResult<long long>::success(parsed.next(), 0);
+            return ParseResult<long long>::error(parsed.next());
         }
     });
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
     constexpr auto parsed = parser(Input{"12345"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
+    static_assert(parsed.next().input == "next");
+}
+namespace test_flatmap_success_to_error {
+    constexpr auto parser = flatMap(string("123"), [] (auto parsed) {
+        if (parsed.is_success() && parsed.result() == "123") {
+            return ParseResult<long long>::error(Input{"next"});
+        } else {
+            return ParseResult<long long>::failure(parsed.next());
+        }
+    });
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"12345"});
+    static_assert(parsed.is_error());
     static_assert(parsed.next().input == "next");
 }
 namespace test_flatmap_failure_to_success {
     constexpr auto parser = flatMap(string("123"), [] (auto parsed) {
-        if (parsed.is_success()) {
-            return ParseResult<long long>::failure(parsed.next());
-        } else {
+        if (parsed.is_failure()) {
             return ParseResult<long long>::success(Input{"next"}, 123);
+        } else {
+            return ParseResult<long long>::error(parsed.next());
         }
     });
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
@@ -52,15 +66,68 @@ namespace test_flatmap_failure_to_success {
 }
 namespace test_flatmap_failure_to_failure {
     constexpr auto parser = flatMap(string("123"), [] (auto parsed) {
-        if (parsed.is_success()) {
-            return ParseResult<long long>::success(parsed.next(), 0);
-        } else {
+        if (parsed.is_failure()) {
             return ParseResult<long long>::failure(Input{"next"});
+        } else {
+            return ParseResult<long long>::success(parsed.next(), 0);
         }
     });
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
     constexpr auto parsed = parser(Input{"unparseable"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
+    static_assert(parsed.next().input == "next");
+}
+namespace test_flatmap_failure_to_error {
+    constexpr auto parser = flatMap(string("123"), [] (auto parsed) {
+        if (parsed.is_failure()) {
+            return ParseResult<long long>::error(Input{"next"});
+        } else {
+            return ParseResult<long long>::success(parsed.next(), 0);
+        }
+    });
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"unparseable"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "next");
+}
+namespace test_flatmap_error_to_success {
+    constexpr auto parser = flatMap(error(), [] (auto parsed) {
+        if (parsed.is_error()) {
+            return ParseResult<long long>::success(Input{"next"}, 123);
+        } else {
+            return ParseResult<long long>::failure(parsed.next());
+        }
+    });
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"unparseable"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result() == 123);
+    static_assert(parsed.next().input == "next");
+}
+namespace test_flatmap_error_to_failure {
+    constexpr auto parser = flatMap(error(), [] (auto parsed) {
+        if (parsed.is_error()) {
+            return ParseResult<long long>::failure(Input{"next"});
+        } else {
+            return ParseResult<long long>::success(parsed.next(), 0);
+        }
+    });
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"unparseable"});
+    static_assert(parsed.is_failure());
+    static_assert(parsed.next().input == "next");
+}
+namespace test_flatmap_error_to_error {
+    constexpr auto parser = flatMap(error(), [] (auto parsed) {
+        if (parsed.is_error()) {
+            return ParseResult<long long>::error(Input{"next"});
+        } else {
+            return ParseResult<long long>::success(parsed.next(), 0);
+        }
+    });
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"unparseable"});
+    static_assert(parsed.is_error());
     static_assert(parsed.next().input == "next");
 }
 namespace test_map_success {
@@ -83,8 +150,17 @@ namespace test_map_failure {
     });
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
     constexpr auto parsed = parser(Input{"12unparseable"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "unparseable");
+}
+namespace test_map_error {
+    constexpr auto parser = map(error_parser(string("123")), [] (auto /*parsed*/) -> long long {
+        throw std::logic_error("This shouldn't be called");
+    });
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"123andtext"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "andtext");
 }
 namespace test_mapvalue_success {
     constexpr auto parser = mapValue(string("123"), static_cast<long long>(123));
@@ -98,10 +174,16 @@ namespace test_mapvalue_failure {
     constexpr auto parser = mapValue(string("123"), static_cast<long long>(123));
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
     constexpr auto parsed = parser(Input{"12unparseable"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "unparseable");
 }
-
+namespace test_mapvalue_error {
+    constexpr auto parser = mapValue(error_parser(string("123")), static_cast<long long>(123));
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"123unparseable"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "unparseable");
+}
 
 namespace test_flatmap_movableonly_success_to_success {
     constexpr auto parser = flatMap(movable_only(string("123")), movable_only([] (auto parsed) {
@@ -122,20 +204,33 @@ namespace test_flatmap_movableonly_success_to_failure {
         if (parsed.is_success() && parsed.result() == "123") {
             return ParseResult<long long>::failure(Input{"next"});
         } else {
-            return ParseResult<long long>::success(parsed.next(), 0);
+            return ParseResult<long long>::error(parsed.next());
         }
     }));
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
     constexpr auto parsed = parser(Input{"12345"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
+    static_assert(parsed.next().input == "next");
+}
+namespace test_flatmap_movableonly_success_to_error {
+    constexpr auto parser = flatMap(movable_only(string("123")), movable_only([] (auto parsed) {
+        if (parsed.is_success() && parsed.result() == "123") {
+            return ParseResult<long long>::error(Input{"next"});
+        } else {
+            return ParseResult<long long>::failure(parsed.next());
+        }
+    }));
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"12345"});
+    static_assert(parsed.is_error());
     static_assert(parsed.next().input == "next");
 }
 namespace test_flatmap_movableonly_failure_to_success {
     constexpr auto parser = flatMap(movable_only(string("123")), movable_only([] (auto parsed) {
-        if (parsed.is_success()) {
-            return ParseResult<long long>::failure(parsed.next());
-        } else {
+        if (parsed.is_failure()) {
             return ParseResult<long long>::success(Input{"next"}, 123);
+        } else {
+            return ParseResult<long long>::error(parsed.next());
         }
     }));
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
@@ -146,17 +241,71 @@ namespace test_flatmap_movableonly_failure_to_success {
 }
 namespace test_flatmap_movableonly_failure_to_failure {
     constexpr auto parser = flatMap(movable_only(string("123")), movable_only([] (auto parsed) {
-        if (parsed.is_success()) {
-            return ParseResult<long long>::success(parsed.next(), 0);
-        } else {
+        if (parsed.is_failure()) {
             return ParseResult<long long>::failure(Input{"next"});
+        } else {
+            return ParseResult<long long>::success(parsed.next(), 0);
         }
     }));
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
     constexpr auto parsed = parser(Input{"unparseable"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "next");
 }
+namespace test_flatmap_movableonly_failure_to_error {
+    constexpr auto parser = flatMap(movable_only(string("123")), movable_only([] (auto parsed) {
+        if (parsed.is_failure()) {
+            return ParseResult<long long>::error(Input{"next"});
+        } else {
+            return ParseResult<long long>::success(parsed.next(), 0);
+        }
+    }));
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"unparseable"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "next");
+}
+namespace test_flatmap_movableonly_error_to_success {
+    constexpr auto parser = flatMap(movable_only(error()), movable_only([] (auto parsed) {
+        if (parsed.is_error()) {
+            return ParseResult<long long>::success(Input{"next"}, 123);
+        } else {
+            return ParseResult<long long>::failure(parsed.next());
+        }
+    }));
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"unparseable"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result() == 123);
+    static_assert(parsed.next().input == "next");
+}
+namespace test_flatmap_movableonly_error_to_failure {
+    constexpr auto parser = flatMap(movable_only(error()), movable_only([] (auto parsed) {
+        if (parsed.is_error()) {
+            return ParseResult<long long>::failure(Input{"next"});
+        } else {
+            return ParseResult<long long>::success(parsed.next(), 0);
+        }
+    }));
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"unparseable"});
+    static_assert(parsed.is_failure());
+    static_assert(parsed.next().input == "next");
+}
+namespace test_flatmap_movableonly_error_to_error {
+    constexpr auto parser = flatMap(movable_only(error()), movable_only([] (auto parsed) {
+        if (parsed.is_error()) {
+            return ParseResult<long long>::error(Input{"next"});
+        } else {
+            return ParseResult<long long>::success(parsed.next(), 0);
+        }
+    }));
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"unparseable"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "next");
+}
+
 namespace test_map_movableonly_success {
     constexpr auto parser = map(movable_only(string("123")), movable_only([] (auto parsed) -> long long {
         if (parsed == "123") {
@@ -177,8 +326,17 @@ namespace test_map_movableonly_failure {
     }));
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
     constexpr auto parsed = parser(Input{"12unparseable"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "unparseable");
+}
+namespace test_map_movableonly_error {
+    constexpr auto parser = map(movable_only(error_parser(string("123"))), movable_only([] (auto /*parsed*/) -> long long {
+        throw std::logic_error("This shouldn't be called");
+    }));
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"123andtext"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "andtext");
 }
 namespace test_mapvalue_movableonly_success {
     constexpr auto parser = mapValue(movable_only(string("123")), static_cast<long long>(123));
@@ -192,7 +350,14 @@ namespace test_mapvalue_movableonly_failure {
     constexpr auto parser = mapValue(movable_only(string("123")), static_cast<long long>(123));
     static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
     constexpr auto parsed = parser(Input{"12unparseable"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
+    static_assert(parsed.next().input == "unparseable");
+}
+namespace test_mapvalue_movableonly_error {
+    constexpr auto parser = mapValue(movable_only(error_parser(string("123"))), static_cast<long long>(123));
+    static_assert(std::is_same_v<parser_result_t<decltype(parser)>, long long>);
+    constexpr auto parsed = parser(Input{"123unparseable"});
+    static_assert(parsed.is_error());
     static_assert(parsed.next().input == "unparseable");
 }
 
@@ -253,6 +418,11 @@ namespace test_flatmap_works_with_movable_only_result_failure {
     static_assert(parsed.is_failure());
 }
 
+namespace test_flatmap_works_with_movable_only_result_error {
+    constexpr auto parsed = flatMap(error_parser_with_movableonly_result(), [] (auto res) {return res;})(Input{"input"});
+    static_assert(parsed.is_error());
+}
+
 TEST(FlatMapParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary_newobjects) {
     size_t copy_count = 0, move_count = 0;
     auto parsed = flatMap(success_parser_with_copycounting_result(&copy_count, &move_count), [&] (auto res) {
@@ -281,6 +451,11 @@ namespace test_map_works_with_movable_only_result_success {
 namespace test_map_works_with_movable_only_result_failure {
     constexpr auto parsed = map(failure_parser_with_movableonly_result(), [] (auto res) {return res;})(Input{"input"});
     static_assert(parsed.is_failure());
+}
+
+namespace test_map_works_with_movable_only_result_error {
+    constexpr auto parsed = map(error_parser_with_movableonly_result(), [] (auto res) {return res;})(Input{"input"});
+    static_assert(parsed.is_error());
 }
 
 TEST(MapParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary_newobjects) {

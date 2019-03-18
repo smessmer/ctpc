@@ -1,6 +1,8 @@
 #include "parsers/phrase.h"
 #include "parsers/string.h"
+#include "parsers/map.h"
 #include "testutils/move_helpers.h"
+#include "testutils/error_parser.h"
 #include <gtest/gtest.h>
 
 using namespace ctpc;
@@ -15,12 +17,17 @@ namespace test_phrase_success {
 }
 namespace test_phrase_failure_in_inner_parser {
     constexpr auto parsed = phrase(string("Hello"))(Input{"HellAnd"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "And");
 }
 namespace test_phrase_failure_in_phrase {
     constexpr auto parsed = phrase(string("Hello"))(Input{"HelloAnd"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
+    static_assert(parsed.next().input == "And");
+}
+namespace test_phrase_error {
+    constexpr auto parsed = phrase(error_parser(string("Hello")))(Input{"HelloAnd"});
+    static_assert(parsed.is_error());
     static_assert(parsed.next().input == "And");
 }
 
@@ -32,12 +39,17 @@ namespace test_phrase_movableonly_success {
 }
 namespace test_phrase_movableonly_failure_in_inner_parser {
     constexpr auto parsed = phrase(movable_only(string("Hello")))(Input{"HellAnd"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "And");
 }
 namespace test_phrase_movableonly_failure_in_phrase {
     constexpr auto parsed = phrase(movable_only(string("Hello")))(Input{"HelloAnd"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
+    static_assert(parsed.next().input == "And");
+}
+namespace test_phrase_movableonly_error {
+    constexpr auto parsed = phrase(movable_only(error_parser(string("Hello"))))(Input{"HelloAnd"});
+    static_assert(parsed.is_error());
     static_assert(parsed.next().input == "And");
 }
 
@@ -47,6 +59,11 @@ TEST(PhraseParserTest, doesntCopyOrMoveParsersMoreThanAbsolutelyNecessary) {
             {ctpc::Input{""}, ctpc::Input{"Found"}, ctpc::Input{"SomethingElse"}, ctpc::Input{"FoundAndSomeMore"}},
             [] () {return string("Found");}
     );
+}
+
+namespace test_phrase_works_with_movable_only_result_phrase_success {
+    constexpr auto parsed = phrase(success_parser_with_movableonly_result())(Input{""});
+    static_assert(parsed.is_success());
 }
 
 namespace test_phrase_works_with_movable_only_result_inner_failure {
@@ -59,9 +76,9 @@ namespace test_phrase_works_with_movable_only_result_phrase_failure {
     static_assert(parsed.is_failure());
 }
 
-namespace test_phrase_works_with_movable_only_result_phrase_success {
-    constexpr auto parsed = phrase(success_parser_with_movableonly_result())(Input{""});
-    static_assert(parsed.is_success());
+namespace test_phrase_works_with_movable_only_result_error {
+    constexpr auto parsed = phrase(error_parser_with_movableonly_result())(Input{"input"});
+    static_assert(parsed.is_error());
 }
 
 TEST(PhraseParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary_failure) {

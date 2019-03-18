@@ -12,12 +12,12 @@ namespace test_string_success {
 }
 namespace test_string_failure_immediate {
     constexpr auto parsed = string("Hello")(Input{"AndSomeOtherText"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "AndSomeOtherText");
 }
 namespace test_string_failure_later {
     constexpr auto parsed = string("Hello")(Input{"HellAndSomeOtherText"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "AndSomeOtherText");
 }
 

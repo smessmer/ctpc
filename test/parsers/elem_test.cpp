@@ -14,12 +14,12 @@ namespace test_elem_fn_success {
 }
 namespace test_elem_fn_failure {
     constexpr auto parsed = elem([] (char) {return false;})(Input{"bandsometext"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "bandsometext");
 }
 namespace test_elem_fn_fatal {
     constexpr auto parsed = elem([] (char) {return true;})(Input{""});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "");
 }
 namespace test_elem_success {
@@ -30,12 +30,12 @@ namespace test_elem_success {
 }
 namespace test_elem_failure {
     constexpr auto parsed = elem('d')(Input{"bandsometext"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "bandsometext");
 }
-namespace test_elem_fatal {
+namespace test_elem_noinputleft {
     constexpr auto parsed = elem('d')(Input{""});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "");
 }
 
@@ -48,7 +48,7 @@ namespace test_elem_fn_movableonly_success {
 
 namespace test_elem_fn_movableonly_failure {
     constexpr auto parsed = elem(movable_only([] (char) {return false;}))(Input{"bandsometext"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "bandsometext");
 }
 

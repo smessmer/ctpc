@@ -2,6 +2,7 @@
 #include "parsers/string.h"
 #include "parsers/integer.h"
 #include "testutils/move_helpers.h"
+#include "testutils/error_parser.h"
 
 using namespace ctpc;
 
@@ -22,8 +23,13 @@ namespace test_seq_one_success {
 }
 namespace test_seq_one_failure {
     constexpr auto parsed = seq(string("ABC"))(Input{"ACDE"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "CDE");
+}
+namespace test_seq_one_error {
+    constexpr auto parsed = seq(error_parser(string("AC"), string("AB")))(Input{"ACDE"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "DE");
 }
 namespace test_seq_two_success {
     constexpr auto parsed = seq(string("ABC"), string("DE"))(Input{"ABCDEFGH"});
@@ -31,15 +37,25 @@ namespace test_seq_two_success {
     static_assert(parsed.result() == std::tuple<std::string_view, std::string_view>{"ABC", "DE"});
     static_assert(parsed.next().input == "FGH");
 }
-namespace test_seq_two_fail_first {
+namespace test_seq_two_failure_first {
     constexpr auto parsed = seq(string("ABC"), string("DE"))(Input{"ACDEFGH"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "CDEFGH");
 }
-namespace test_seq_two_fail_second {
+namespace test_seq_two_failure_second {
     constexpr auto parsed = seq(string("ABC"), string("DE"))(Input{"ABCDAFGH"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "AFGH");
+}
+namespace test_seq_two_error_first {
+    constexpr auto parsed = seq(error_parser(string("AC"), string("AB")), string("DE"))(Input{"ACDEFGH"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "DEFGH");
+}
+namespace test_seq_two_error_second {
+    constexpr auto parsed = seq(string("ABC"), error_parser(string("DA"), string("DE")))(Input{"ABCDAFGH"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "FGH");
 }
 namespace test_seq_three_success {
     constexpr auto parsed = seq(string("ABC"), string("DE"), integer())(Input{"ABCDE23FGH"});
@@ -47,20 +63,35 @@ namespace test_seq_three_success {
     static_assert(parsed.result() == std::tuple<std::string_view, std::string_view, int>{"ABC", "DE", 23});
     static_assert(parsed.next().input == "FGH");
 }
-namespace test_seq_three_fail_first {
+namespace test_seq_three_failure_first {
     constexpr auto parsed = seq(string("ABC"), string("DE"), integer())(Input{"ACDE23FGH"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "CDE23FGH");
 }
-namespace test_seq_three_fail_second {
+namespace test_seq_three_failure_second {
     constexpr auto parsed = seq(string("ABC"), string("DE"), integer())(Input{"ABCDA23FGH"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "A23FGH");
 }
-namespace test_seq_three_fail_third {
+namespace test_seq_three_failure_third {
     constexpr auto parsed = seq(string("ABC"), string("DE"), integer())(Input{"ABCDEFGH"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "FGH");
+}
+namespace test_seq_three_error_first {
+    constexpr auto parsed = seq(error_parser(string("AC"), string("AB")), string("DE"), integer())(Input{"ACDE23FGH"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "DE23FGH");
+}
+namespace test_seq_three_error_second {
+    constexpr auto parsed = seq(string("ABC"), error_parser(string("DA"), string("DE")), integer())(Input{"ABCDA23FGH"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "23FGH");
+}
+namespace test_seq_three_error_third {
+    constexpr auto parsed = seq(string("ABC"), integer(), error_parser(string("FGH"), string("O")))(Input{"ABC23FGHIJK"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "IJK");
 }
 
 namespace test_seq_movableonly_success {
@@ -71,8 +102,13 @@ namespace test_seq_movableonly_success {
 }
 namespace test_seq_movableonly_failure {
     constexpr auto parsed = seq(movable_only(string("ABC")), movable_only(string("DE")), movable_only(integer()))(Input{"ABCDA23FGH"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "A23FGH");
+}
+namespace test_seq_movableonly_error {
+    constexpr auto parsed = seq(movable_only(error()), movable_only(error()), movable_only(integer()))(Input{"ABCDA23FGH"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "ABCDA23FGH");
 }
 
 TEST(SeqParserTest, doesntCopyOrMoveParsersMoreThanAbsolutelyNecessary) {

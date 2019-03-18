@@ -10,7 +10,7 @@ namespace test_numeric_type {
 }
 namespace test_numeric_failure {
     constexpr auto parsed = numeric()(Input{"a123"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "a123");
 }
 namespace test_numeric_success_0 {
@@ -36,7 +36,7 @@ namespace test_digit_type {
 }
 namespace test_digit_failure {
     constexpr auto parsed = digit()(Input{"a123"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "a123");
 }
 namespace test_digit_success_0 {
@@ -59,7 +59,7 @@ namespace test_digit_success_9 {
 }
 namespace test_integer_failure {
     constexpr auto parsed = integer()(Input{"dsometext"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "dsometext");
 }
 TEST(IntegerTest, failure) {

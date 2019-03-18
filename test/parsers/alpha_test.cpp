@@ -6,7 +6,7 @@ namespace {
 
 namespace test_alphasmall_failure {
     constexpr auto parsed = alpha_small()(Input{"ABC"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "ABC");
 }
 namespace test_alphasmall_success_a {
@@ -29,7 +29,7 @@ namespace test_alphasmall_success_z {
 }
 namespace test_alphalarge_failure {
     constexpr auto parsed = alpha_large()(Input{"abc"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "abc");
 }
 namespace test_alphalarge_success_a {
@@ -52,12 +52,12 @@ namespace test_alphalarge_success_z {
 }
 namespace test_alphanumeric_failure_space {
     constexpr auto parsed = alphanumeric()(Input{" "});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == " ");
 }
 namespace test_alphanumeric_failure_newline {
     constexpr auto parsed = alphanumeric()(Input{"\n"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "\n");
 }
 namespace test_alphanumeric_success_a {
@@ -116,7 +116,7 @@ namespace test_alphanumeric_success_9 {
 }
 namespace test_whitespace_failure {
     constexpr auto parsed = whitespace()(Input{"abc"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "abc");
 }
 namespace test_whitespace_success {

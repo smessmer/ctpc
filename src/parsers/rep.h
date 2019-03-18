@@ -6,7 +6,6 @@
 #include "parsers/utils/cvector.h"
 
 // TODO Test cvector-returning parsers to work with types that don't have a default constructor after cvector is fixed
-// TODO Make repsep handle errors (i.e. fatals) in its child parsers correctly and test it
 
 
 namespace ctpc {
@@ -36,7 +35,7 @@ namespace ctpc {
                     }
                 }
                 if (initResult.is_error()) {
-                    return ParseResult<Accumulator>::error(input);
+                    return ParseResult<Accumulator>::error(initResult.next());
                 }
                 ASSERT(initResult.is_success());
                 Input next = initResult.next();

@@ -7,7 +7,6 @@
 namespace ctpc {
 
 // TODO Add test cases for ParseResult
-// TODO Add test cases to all combined parsers for how they handle ERROR state
 // TODO Add error messages
 // TODO For all parsers: Test mutable only results, and also count copying&moving of the result
 

@@ -1,6 +1,7 @@
 #include "parsers/opt.h"
 #include "parsers/string.h"
 #include "testutils/move_helpers.h"
+#include "testutils/error_parser.h"
 #include <gtest/gtest.h>
 
 using namespace ctpc;
@@ -19,6 +20,11 @@ namespace test_opt_failure {
     static_assert(!parsed.result().has_value());
     static_assert(parsed.next().input == "FoSomethingElse");
 }
+namespace test_opt_error {
+    constexpr auto parsed = opt(error_parser(string("Fo")))(Input{"FoSomethingElse"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "SomethingElse");
+}
 
 namespace test_opt_movableonly_success {
     constexpr auto parsed = opt(movable_only(string("Found")))(Input{"FoundSomething"});
@@ -32,6 +38,11 @@ namespace test_opt_movableonly_failure {
     static_assert(!parsed.result().has_value());
     static_assert(parsed.next().input == "FoSomethingElse");
 }
+namespace test_opt_movableonly_error {
+    constexpr auto parsed = opt(error_parser(movable_only(string("Fo"))))(Input{"FoSomethingElse"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "SomethingElse");
+}
 
 TEST(OptParserTest, doesntCopyOrMoveParsersMoreThanAbsolutelyNecessary) {
     testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(
@@ -41,14 +52,19 @@ TEST(OptParserTest, doesntCopyOrMoveParsersMoreThanAbsolutelyNecessary) {
     );
 }
 
+namespace test_opt_works_with_movable_only_result_success {
+    constexpr auto parsed = opt(success_parser_with_movableonly_result())(Input{"input"});
+    static_assert(parsed.is_success());
+}
+
 namespace test_opt_works_with_movable_only_result_failure {
     constexpr auto parsed = opt(failure_parser_with_movableonly_result())(Input{"input"});
     static_assert(parsed.is_success());
 }
 
-namespace test_opt_works_with_movable_only_result_success {
-    constexpr auto parsed = opt(success_parser_with_movableonly_result())(Input{"input"});
-    static_assert(parsed.is_success());
+namespace test_opt_works_with_movable_only_result_error {
+    constexpr auto parsed = opt(error_parser_with_movableonly_result())(Input{"input"});
+    static_assert(parsed.is_error());
 }
 
 TEST(OptParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary) {

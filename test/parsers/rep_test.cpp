@@ -2,6 +2,7 @@
 #include "parsers/string.h"
 #include "parsers/integer.h"
 #include "testutils/move_helpers.h"
+#include "testutils/error_parser.h"
 #include <gtest/gtest.h>
 
 using namespace ctpc;
@@ -187,6 +188,20 @@ TEST(RepsepTest, empty) {
     }).test_all_runtime();
 }
 
+namespace test_repsep_empty_error {
+    static_assert(repsepTestCase(error(), string("Sep"), Input{""}, [] (auto parsed) {
+        expectTrue_(parsed.is_error());
+        expectTrue_("" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepsepTest, empty_error) {
+    repsepTestCase(error(), string("Sep"), Input{""}, [] (auto parsed) {
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("", parsed.next().input);
+    }).test_all_runtime();
+}
+
 namespace test_repsep_none {
     static_assert(repsepTestCase(string("Elem"), string("Sep"), Input{"El"}, [] (auto parsed) {
         static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
@@ -201,6 +216,20 @@ TEST(RepsepTest, none) {
         static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
         EXPECT_TRUE(parsed.is_success());
         EXPECT_EQ(0, parsed.result().size());
+        EXPECT_EQ("El", parsed.next().input);
+    }).test_all_runtime();
+}
+
+namespace test_repsep_none_error {
+    static_assert(repsepTestCase(error(), string("Sep"), Input{"El"}, [] (auto parsed) {
+        expectTrue_(parsed.is_error());
+        expectTrue_("El" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepsepTest, none_error) {
+    repsepTestCase(error(), string("Sep"), Input{"El"}, [] (auto parsed) {
+        EXPECT_TRUE(parsed.is_error());
         EXPECT_EQ("El", parsed.next().input);
     }).test_all_runtime();
 }
@@ -225,6 +254,22 @@ TEST(RepsepTest, one) {
     }).test_all_runtime();
 }
 
+namespace test_repsep_one_error {
+    static_assert(repsepTestCase(error_parser(string("Elem")), string("Sep"), Input{"ElemSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Sa" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepsepTest, one_error) {
+    repsepTestCase(error_parser(string("Elem")), string("Sep"), Input{"ElemSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("Sa", parsed.next().input);
+    }).test_all_runtime();
+}
+
 namespace test_repsep_one_followingsep {
     static_assert(repsepTestCase(string("Elem"), string("Sep"), Input{"ElemSep"}, [] (auto parsed) {
         static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
@@ -242,6 +287,22 @@ TEST(RepsepTest, one_followingsep) {
         EXPECT_EQ(1, parsed.result().size());
         EXPECT_EQ("Elem", parsed.result()[0]);
         EXPECT_EQ("Sep", parsed.next().input); // last separator doesn't count, stays in input.
+    }).test_all_runtime();
+}
+
+namespace test_repsep_one_followingsep_error {
+    static_assert(repsepTestCase(string("Elem"), error_parser(string("Sep")), Input{"ElemSepSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Sa" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepsepTest, one_followingsep_error) {
+    repsepTestCase(string("Elem"), error_parser(string("Sep")), Input{"ElemSepSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("Sa", parsed.next().input);
     }).test_all_runtime();
 }
 
@@ -267,6 +328,22 @@ TEST(RepsepTest, two) {
     }).test_all_runtime();
 }
 
+namespace test_repsep_two_error {
+    static_assert(repsepTestCase(error_parser(string("Err"), string("Elem")), string("Sep"), Input{"ElemSepErrText"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Text" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepsepTest, two_error) {
+    repsepTestCase(error_parser(string("Err"), string("Elem")), string("Sep"), Input{"ElemSepErrText"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("Text", parsed.next().input);
+    }).test_all_runtime();
+}
+
 namespace test_repsep_two_followingsep {
     static_assert(repsepTestCase(integer(), string("Sep"), Input{"23Sep39Sep"}, [] (auto parsed) {
         static_assert(std::is_same_v<int64_t, typename decltype(parsed)::result_type::value_type>);
@@ -286,6 +363,22 @@ TEST(RepsepTest, two_followingsep) {
         EXPECT_EQ(23, parsed.result()[0]);
         EXPECT_EQ(39, parsed.result()[1]);
         EXPECT_EQ("Sep", parsed.next().input); // last separator doesn't count, stays in input.
+    }).test_all_runtime();
+}
+
+namespace test_repsep_two_followingsep_error {
+    static_assert(repsepTestCase(string("Elem"), error_parser(string("Err"), string("Sep")), Input{"ElemSepElemErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Sa" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepsepTest, two_followingsep_error) {
+    repsepTestCase(string("Elem"), error_parser(string("Err"), string("Sep")), Input{"ElemSepElemErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("Sa", parsed.next().input);
     }).test_all_runtime();
 }
 
@@ -313,6 +406,22 @@ TEST(RepsepTest, three) {
     }).test_all_runtime();
 }
 
+namespace test_repsep_three_error {
+    static_assert(repsepTestCase(error_parser(string("Err"), string("Elem")), string("Sep"), Input{"ElemSepElemSepErrText"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Text" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepsepTest, three_error) {
+    repsepTestCase(error_parser(string("Err"), string("Elem")), string("Sep"), Input{"ElemSepElemSepErrText"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("Text", parsed.next().input);
+    }).test_all_runtime();
+}
+
 namespace test_repsep_three_followingsep {
     static_assert(repsepTestCase(integer(), string("Sep"), Input{"23Sep39Sep358SepSomething"}, [] (auto parsed) {
         static_assert(std::is_same_v<int64_t, typename decltype(parsed)::result_type::value_type>);
@@ -334,6 +443,22 @@ TEST(RepsepTest, three_followingsep) {
         EXPECT_EQ(39, parsed.result()[1]);
         EXPECT_EQ(358, parsed.result()[2]);
         EXPECT_EQ("SepSomething", parsed.next().input); // last separator doesn't count, stays in input.
+    }).test_all_runtime();
+}
+
+namespace test_repsep_three_followingsep_error {
+    static_assert(repsepTestCase(string("Elem"), error_parser(string("Err"), string("Sep")), Input{"ElemSepElemSepElemErrSomething"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Something" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepsepTest, three_followingsep_error) {
+    repsepTestCase(string("Elem"), error_parser(string("Err"), string("Sep")), Input{"ElemSepElemSepElemErrSomething"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("Something", parsed.next().input);
     }).test_all_runtime();
 }
 
@@ -817,6 +942,20 @@ TEST(Repsep1Test, empty) {
     }).test_all_runtime();
 }
 
+namespace test_repsep1_empty_error {
+    static_assert(repsep1TestCase(error(), string("Sep"), Input{""}, [] (auto parsed) {
+        expectTrue_(parsed.is_error());
+        expectTrue_("" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(Repsep1Test, empty_error) {
+    repsep1TestCase(error(), string("Sep"), Input{""}, [] (auto parsed) {
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("", parsed.next().input);
+    }).test_all_runtime();
+}
+
 namespace test_repsep1_none {
     static_assert(repsep1TestCase(string("Elem"), string("Sep"), Input{"El"}, [] (auto parsed) {
         static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
@@ -829,6 +968,20 @@ TEST(Repsep1Test, none) {
     repsep1TestCase(string("Elem"), string("Sep"), Input{"El"}, [] (auto parsed) {
         static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
         EXPECT_TRUE(parsed.is_failure());
+        EXPECT_EQ("El", parsed.next().input);
+    }).test_all_runtime();
+}
+
+namespace test_repsep1_none_error {
+    static_assert(repsep1TestCase(error(), string("Sep"), Input{"El"}, [] (auto parsed) {
+        expectTrue_(parsed.is_error());
+        expectTrue_("El" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(Repsep1Test, none_error) {
+    repsep1TestCase(error(), string("Sep"), Input{"El"}, [] (auto parsed) {
+        EXPECT_TRUE(parsed.is_error());
         EXPECT_EQ("El", parsed.next().input);
     }).test_all_runtime();
 }
@@ -853,6 +1006,22 @@ TEST(Repsep1Test, one) {
     }).test_all_runtime();
 }
 
+namespace test_repsep1_one_error {
+    static_assert(repsep1TestCase(error_parser(string("Err"), string("Elem")), string("Sep"), Input{"ErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Sa" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(Repsep1Test, one_error) {
+    repsep1TestCase(error_parser(string("Err"), string("Elem")), string("Sep"), Input{"ErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("Sa", parsed.next().input);
+    }).test_all_runtime();
+}
+
 namespace test_repsep1_one_followingsep {
     static_assert(repsep1TestCase(string("Elem"), string("Sep"), Input{"ElemSep"}, [] (auto parsed) {
         static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
@@ -870,6 +1039,22 @@ TEST(Repsep1Test, one_followingsep) {
         EXPECT_EQ(1, parsed.result().size());
         EXPECT_EQ("Elem", parsed.result()[0]);
         EXPECT_EQ("Sep", parsed.next().input); // last separator doesn't count, stays in input.
+    }).test_all_runtime();
+}
+
+namespace test_repsep1_one_followingsep_error {
+    static_assert(repsep1TestCase(string("Elem"), error_parser(string("Err"), string("Sep")), Input{"ElemErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Sa" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(Repsep1Test, one_followingsep_error) {
+    repsep1TestCase(string("Elem"), error_parser(string("Err"), string("Sep")), Input{"ElemErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("Sa", parsed.next().input);
     }).test_all_runtime();
 }
 
@@ -895,6 +1080,22 @@ TEST(Repsep1Test, two) {
     }).test_all_runtime();
 }
 
+namespace test_repsep1_two_error {
+    static_assert(repsep1TestCase(error_parser(string("Err"), string("Elem")), string("Sep"), Input{"ElemSepErrText"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Text" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(Repsep1Test, two_error) {
+    repsep1TestCase(error_parser(string("Err"), string("Elem")), string("Sep"), Input{"ElemSepErrText"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("Text", parsed.next().input);
+    }).test_all_runtime();
+}
+
 namespace test_repsep1_two_followingsep {
     static_assert(repsep1TestCase(integer(), string("Sep"), Input{"23Sep39Sep"}, [] (auto parsed) {
         static_assert(std::is_same_v<int64_t, typename decltype(parsed)::result_type::value_type>);
@@ -914,6 +1115,22 @@ TEST(Repsep1Test, two_followingsep) {
         EXPECT_EQ(23, parsed.result()[0]);
         EXPECT_EQ(39, parsed.result()[1]);
         EXPECT_EQ("Sep", parsed.next().input); // last separator doesn't count, stays in input.
+    }).test_all_runtime();
+}
+
+namespace test_repsep1_two_followingsep_error {
+    static_assert(repsep1TestCase(string("Elem"), error_parser(string("Err"), string("Sep")), Input{"ElemSepElemErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Sa" == parsed.next().input); // last separator doesn't count, stays in input.
+    }).test_all_compiletime());
+}
+
+TEST(Repsep1Test, two_followingsep_error) {
+    repsep1TestCase(string("Elem"), error_parser(string("Err"), string("Sep")), Input{"ElemSepElemErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("Sa", parsed.next().input); // last separator doesn't count, stays in input.
     }).test_all_runtime();
 }
 
@@ -941,6 +1158,22 @@ TEST(Repsep1Test, three) {
     }).test_all_runtime();
 }
 
+namespace test_repsep1_three_error {
+    static_assert(repsep1TestCase(error_parser(string("Err"), string("Elem")), string("Sep"), Input{"ElemSepElemSepErrText"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Text" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(Repsep1Test, three_error) {
+    repsep1TestCase(error_parser(string("Err"), string("Elem")), string("Sep"), Input{"ElemSepElemSepErrText"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("Text", parsed.next().input);
+    }).test_all_runtime();
+}
+
 namespace test_repsep1_three_followingsep {
     static_assert(repsep1TestCase(integer(), string("Sep"), Input{"23Sep39Sep358SepSomething"}, [] (auto parsed) {
         static_assert(std::is_same_v<int64_t, typename decltype(parsed)::result_type::value_type>);
@@ -962,6 +1195,22 @@ TEST(Repsep1Test, three_followingsep) {
         EXPECT_EQ(39, parsed.result()[1]);
         EXPECT_EQ(358, parsed.result()[2]);
         EXPECT_EQ("SepSomething", parsed.next().input); // last separator doesn't count, stays in input.
+    }).test_all_runtime();
+}
+
+namespace test_repsep1_three_followingsep_error {
+    static_assert(repsep1TestCase(string("Elem"), error_parser(string("Err"), string("Sep")), Input{"ElemSepElemSepElemErrSomething"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Something" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(Repsep1Test, three_followingsep_error) {
+    repsep1TestCase(string("Elem"), error_parser(string("Err"), string("Sep")), Input{"ElemSepElemSepElemErrSomething"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("Something", parsed.next().input);
     }).test_all_runtime();
 }
 
@@ -1439,6 +1688,20 @@ TEST(RepParserTest, empty) {
     }).test_all_runtime();
 }
 
+namespace test_rep_empty_error {
+    static_assert(repTestCase(error(), Input{""}, [] (auto parsed) {
+        expectTrue_(parsed.is_error());
+        expectTrue_("" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepParserTest, empty_error) {
+    repTestCase(error(), Input{""}, [] (auto parsed) {
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("", parsed.next().input);
+    }).test_all_runtime();
+}
+
 namespace test_rep_none {
     static_assert(repTestCase(string("Elem"), Input{"El"}, [] (auto parsed) {
         static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
@@ -1453,6 +1716,20 @@ TEST(RepParserTest, none) {
         static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
         EXPECT_TRUE(parsed.is_success());
         EXPECT_EQ(0, parsed.result().size());
+        EXPECT_EQ("El", parsed.next().input);
+    }).test_all_runtime();
+}
+
+namespace test_rep_none_error {
+    static_assert(repTestCase(error(), Input{"El"}, [] (auto parsed) {
+        expectTrue_(parsed.is_error());
+        expectTrue_("El" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepParserTest, none_error) {
+    repTestCase(error(), Input{"El"}, [] (auto parsed) {
+        EXPECT_TRUE(parsed.is_error());
         EXPECT_EQ("El", parsed.next().input);
     }).test_all_runtime();
 }
@@ -1473,6 +1750,22 @@ TEST(RepParserTest, one) {
         EXPECT_TRUE(parsed.is_success());
         EXPECT_EQ(1, parsed.result().size());
         EXPECT_EQ("Elem", parsed.result()[0]);
+        EXPECT_EQ("Sa", parsed.next().input);
+    }).test_all_runtime();
+}
+
+namespace test_rep_one_error {
+    static_assert(repTestCase(error_parser(string("Err"), string("Elem")), Input{"ErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Sa" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepParserTest, one_error) {
+    repTestCase(error_parser(string("Err"), string("Elem")), Input{"ErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
         EXPECT_EQ("Sa", parsed.next().input);
     }).test_all_runtime();
 }
@@ -1499,6 +1792,22 @@ TEST(RepParserTest, two) {
     }).test_all_runtime();
 }
 
+namespace test_rep_two_error {
+    static_assert(repTestCase(error_parser(string("Err"), string("Elem")), Input{"ElemErr"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepParserTest, two_error) {
+    repTestCase(error_parser(string("Err"), string("Elem")), Input{"ElemErr"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("", parsed.next().input);
+    }).test_all_runtime();
+}
+
 namespace test_rep_three {
     static_assert(repTestCase(string("Elem"), Input{"ElemElemElemSa"}, [] (auto parsed) {
         static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
@@ -1519,6 +1828,22 @@ TEST(RepParserTest, three) {
         EXPECT_EQ("Elem", parsed.result()[0]);
         EXPECT_EQ("Elem", parsed.result()[1]);
         EXPECT_EQ("Elem", parsed.result()[2]);
+        EXPECT_EQ("Sa", parsed.next().input);
+    }).test_all_runtime();
+}
+
+namespace test_rep_three_error {
+    static_assert(repTestCase(error_parser(string("Err"), string("Elem")), Input{"ElemElemErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Sa" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(RepParserTest, three_error) {
+    repTestCase(error_parser(string("Err"), string("Elem")), Input{"ElemElemErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
         EXPECT_EQ("Sa", parsed.next().input);
     }).test_all_runtime();
 }
@@ -1961,6 +2286,20 @@ TEST(Rep1ParserTest, empty) {
     }).test_all_runtime();
 }
 
+namespace test_rep1_empty_error {
+    static_assert(rep1TestCase(error(), Input{""}, [] (auto parsed) {
+        expectTrue_(parsed.is_error());
+        expectTrue_("" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(Rep1ParserTest, empty_error) {
+    rep1TestCase(error(), Input{""}, [] (auto parsed) {
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("", parsed.next().input);
+    }).test_all_runtime();
+}
+
 namespace test_rep1_none {
     static_assert(rep1TestCase(string("Elem"), Input{"El"}, [] (auto parsed) {
         static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
@@ -1973,6 +2312,20 @@ TEST(Rep1ParserTest, none) {
     rep1TestCase(string("Elem"), Input{"El"}, [] (auto parsed) {
         static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
         EXPECT_TRUE(parsed.is_failure());
+        EXPECT_EQ("El", parsed.next().input);
+    }).test_all_runtime();
+}
+
+namespace test_rep1_none_error {
+    static_assert(rep1TestCase(error(), Input{"El"}, [] (auto parsed) {
+        expectTrue_(parsed.is_error());
+        expectTrue_("El" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(Rep1ParserTest, none_error) {
+    rep1TestCase(error(), Input{"El"}, [] (auto parsed) {
+        EXPECT_TRUE(parsed.is_error());
         EXPECT_EQ("El", parsed.next().input);
     }).test_all_runtime();
 }
@@ -1993,6 +2346,22 @@ TEST(Rep1ParserTest, one) {
         EXPECT_TRUE(parsed.is_success());
         EXPECT_EQ(1, parsed.result().size());
         EXPECT_EQ("Elem", parsed.result()[0]);
+        EXPECT_EQ("Sa", parsed.next().input);
+    }).test_all_runtime();
+}
+
+namespace test_rep1_one_error {
+    static_assert(rep1TestCase(error_parser(string("Err"), string("Elem")), Input{"ErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Sa" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(Rep1ParserTest, one_error) {
+    rep1TestCase(error_parser(string("Err"), string("Elem")), Input{"ErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
         EXPECT_EQ("Sa", parsed.next().input);
     }).test_all_runtime();
 }
@@ -2019,6 +2388,22 @@ TEST(Rep1ParserTest, two) {
     }).test_all_runtime();
 }
 
+namespace test_rep1_two_error {
+    static_assert(rep1TestCase(error_parser(string("Err"), string("Elem")), Input{"ElemErr"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(Rep1ParserTest, two_error) {
+    rep1TestCase(error_parser(string("Err"), string("Elem")), Input{"ElemErr"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
+        EXPECT_EQ("", parsed.next().input);
+    }).test_all_runtime();
+}
+
 namespace test_rep1_three {
     static_assert(rep1TestCase(string("Elem"), Input{"ElemElemElemSa"}, [] (auto parsed) {
         static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
@@ -2039,6 +2424,22 @@ TEST(Rep1ParserTest, three) {
         EXPECT_EQ("Elem", parsed.result()[0]);
         EXPECT_EQ("Elem", parsed.result()[1]);
         EXPECT_EQ("Elem", parsed.result()[2]);
+        EXPECT_EQ("Sa", parsed.next().input);
+    }).test_all_runtime();
+}
+
+namespace test_rep1_three_error {
+    static_assert(rep1TestCase(error_parser(string("Err"), string("Elem")), Input{"ElemElemErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        expectTrue_(parsed.is_error());
+        expectTrue_("Sa" == parsed.next().input);
+    }).test_all_compiletime());
+}
+
+TEST(Rep1ParserTest, three_error) {
+    rep1TestCase(error_parser(string("Err"), string("Elem")), Input{"ElemElemErrSa"}, [] (auto parsed) {
+        static_assert(std::is_same_v<std::string_view, typename decltype(parsed)::result_type::value_type>);
+        EXPECT_TRUE(parsed.is_error());
         EXPECT_EQ("Sa", parsed.next().input);
     }).test_all_runtime();
 }

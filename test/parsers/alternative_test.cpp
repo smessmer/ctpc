@@ -3,6 +3,7 @@
 #include "parsers/elem.h"
 #include "parsers/map.h"
 #include "testutils/move_helpers.h"
+#include "testutils/error_parser.h"
 
 #include <gtest/gtest.h>
 
@@ -12,7 +13,7 @@ namespace {
 
 namespace test_alternative_empty {
     constexpr auto parsed = alternative()(Input{"sometext"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "sometext");
 }
 namespace test_alternative_one_success {
@@ -23,7 +24,12 @@ namespace test_alternative_one_success {
 }
 namespace test_alternative_one_failure {
     constexpr auto parsed = alternative(string("One"))(Input{"OnAndSomeText"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
+    static_assert(parsed.next().input == "AndSomeText");
+}
+namespace test_alternative_one_error {
+    constexpr auto parsed = alternative(error_parser(string("On")))(Input{"OnAndSomeText"});
+    static_assert(parsed.is_error());
     static_assert(parsed.next().input == "AndSomeText");
 }
 namespace test_alternative_two_success_first {
@@ -40,26 +46,36 @@ namespace test_alternative_two_success_second {
 }
 namespace test_alternative_two_failure_first_is_longest_match {
     constexpr auto parsed = alternative(string("Ones"), string("OnTwo"))(Input{"OneThreeAndSomeText"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     // return the position from the parser that had the longest match before failing (i.e. "One")
     static_assert(parsed.next().input == "ThreeAndSomeText");
 }
 namespace test_alternative_two_failure_second_is_longest_match {
     constexpr auto parsed = alternative(string("Ones"), string("OnTwo"))(Input{"OnTwThreeAndSomeText"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     // return the position from the parser that had the longest match before failing (i.e. "OnTw")
     static_assert(parsed.next().input == "ThreeAndSomeText");
 }
 namespace test_alternative_two_failure_all_are_longest_match {
     constexpr auto parsed = alternative(string("Ones"), string("OnTwo"))(Input{"OnSomethingElse"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     // return the position from the parser that had the longest match before failing (i.e. "On")
     static_assert(parsed.next().input == "SomethingElse");
 }
 namespace test_alternative_two_failure_none_is_longest_match {
     constexpr auto parsed = alternative(string("Ones"), string("OnTwo"))(Input{"SomethingElse"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     static_assert(parsed.next().input == "SomethingElse");
+}
+namespace test_alternative_two_error_first {
+    constexpr auto parsed = alternative(error_parser(string("One")), string("One"))(Input{"OneAndSomeText"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "AndSomeText");
+}
+namespace test_alternative_two_error_second {
+    constexpr auto parsed = alternative(string("One"), error_parser(string("OnTwo")))(Input{"OnTwoAndSomeText"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "AndSomeText");
 }
 namespace test_alternative_three_success_first {
     constexpr auto parsed = alternative(string("One"), string("OnTwo"), string("OnThree"))(Input{"OnesAndSomeText"});
@@ -81,33 +97,48 @@ namespace test_alternative_three_success_third {
 }
 namespace test_alternative_three_failure_first_is_longest_match {
     constexpr auto parsed = alternative(string("Ones"), string("OnTwo"), string("OnThree"))(Input{"OneText"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     // return the position from the parser that had the longest match before failing (i.e. "One")
     static_assert(parsed.next().input == "Text");
 }
 namespace test_alternative_three_failure_second_is_longest_match {
     constexpr auto parsed = alternative(string("Ones"), string("OnTwo"), string("OnThree"))(Input{"OnTwThree"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     // return the position from the parser that had the longest match before failing (i.e. "OneTw")
     static_assert(parsed.next().input == "Three");
 }
 namespace test_alternative_three_failure_third_is_longest_match {
     constexpr auto parsed = alternative(string("Ones"), string("OnTwo"), string("OnThree"))(Input{"OnThreText"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     // return the position from the parser that had the longest match before failing (i.e. "OnThre")
     static_assert(parsed.next().input == "Text");
 }
 namespace test_alternative_three_failure_all_are_longest_match {
     constexpr auto parsed = alternative(string("Ones"), string("OnTwo"), string("OnThree"))(Input{"OnSomethingElse"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     // return the position from the parser that had the longest match before failing (i.e. "On")
     static_assert(parsed.next().input == "SomethingElse");
 }
 namespace test_alternative_three_failure_none_is_longest_match {
     constexpr auto parsed = alternative(string("Ones"), string("OnTwo"), string("OnThree"))(Input{"SomethingElse"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
     // return the position from the parser that had the longest match before failing (i.e. "On")
     static_assert(parsed.next().input == "SomethingElse");
+}
+namespace test_alternative_three_error_first {
+    constexpr auto parsed = alternative(error_parser(string("One")), string("On"), string("Ones"))(Input{"OnesAndSomeText"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "sAndSomeText");
+}
+namespace test_alternative_three_error_second {
+    constexpr auto parsed = alternative(string("One"), error_parser(string("OnTwo")), string("On"))(Input{"OnTwoText"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "Text");
+}
+namespace test_alternative_three_error_third {
+    constexpr auto parsed = alternative(string("One"), string("OnTwo"), error_parser(string("OnThree")))(Input{"OnThreeText"});
+    static_assert(parsed.is_error());
+    static_assert(parsed.next().input == "Text");
 }
 
 namespace test_alternative_works_with_movable_only_parsers_success {
@@ -119,7 +150,14 @@ namespace test_alternative_works_with_movable_only_parsers_success {
 
 namespace test_alternative_works_with_movable_only_parsers_failure {
     constexpr auto parsed = alternative(movable_only(string("Ones")), movable_only(string("OnTwo")), movable_only(string("OnThree")))(Input{"OnTwThree"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
+    // return the position from the parser that had the longest match before failing (i.e. "OneTw")
+    static_assert(parsed.next().input == "Three");
+}
+
+namespace test_alternative_works_with_movable_only_parsers_errpr {
+    constexpr auto parsed = alternative(movable_only(string("Ones")), movable_only(error_parser(string("OnTw"))), movable_only(string("OnThree")))(Input{"OnTwThree"});
+    static_assert(parsed.is_error());
     // return the position from the parser that had the longest match before failing (i.e. "OneTw")
     static_assert(parsed.next().input == "Three");
 }
@@ -141,7 +179,12 @@ namespace test_alternative_works_with_movable_only_result_success {
 
 namespace test_alternative_works_with_movable_only_result_failure {
     constexpr auto parsed = alternative(failure_parser_with_movableonly_result(), failure_parser_with_movableonly_result(), failure_parser_with_movableonly_result())(Input{"input"});
-    static_assert(!parsed.is_success());
+    static_assert(parsed.is_failure());
+}
+
+namespace test_alternative_works_with_movable_only_result_error {
+    constexpr auto parsed = alternative(error_parser_with_movableonly_result(), error_parser_with_movableonly_result(), error_parser_with_movableonly_result())(Input{"input"});
+    static_assert(parsed.is_error());
 }
 
 TEST(AlternativeParserTest, doesntCopyOrMoveResultMoreThanAbsolutelyNecessary) {

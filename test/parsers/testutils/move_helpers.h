@@ -207,15 +207,21 @@ inline void testDoesntCopyOrMoveParsersMoreThanAbsolutelyNecessary(ParentParserC
     ).runTest();
 }
 
+constexpr auto success_parser_with_movableonly_result() {
+    return [] (ctpc::Input input) {
+        return ctpc::ParseResult<movable_only<int>>::success(input, movable_only<int>(3));
+    };
+}
+
 constexpr auto failure_parser_with_movableonly_result() {
     return [] (ctpc::Input input) {
         return ctpc::ParseResult<movable_only<int>>::failure(input);
     };
 }
 
-constexpr auto success_parser_with_movableonly_result() {
+constexpr auto error_parser_with_movableonly_result() {
     return [] (ctpc::Input input) {
-        return ctpc::ParseResult<movable_only<int>>::success(input, movable_only<int>(3));
+        return ctpc::ParseResult<movable_only<int>>::error(input);
     };
 }
 

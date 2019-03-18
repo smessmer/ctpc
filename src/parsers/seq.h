@@ -41,7 +41,6 @@ namespace details {
 
 }
 
-// TODO Make seq handle errors (i.e. fatals) in its child parsers correctly and test it
 template<class... Parsers>
 constexpr auto seq(Parsers&&... parsers) {
     using result_type = std::tuple<parser_result_t<Parsers>...>;
