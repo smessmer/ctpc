@@ -39,5 +39,11 @@ namespace {
         static_assert(parsed.is_failure());
         static_assert(parsed.next().input == "");
     }
-    
+
+    namespace parameter_failure_spaceinsteadofseparator {
+        constexpr auto parsed = ctpc::funcsig_parser::parameter()(ctpc::Input{"name type"});
+        static_assert(parsed.is_failure());
+        static_assert(parsed.next().input == "type");
+    }
+
 }

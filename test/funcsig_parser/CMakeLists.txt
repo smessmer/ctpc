@@ -1,6 +1,7 @@
 project(funcsig-parser-test)
 
 set(SOURCES
+    function_signature_test.cpp
     identifier_test.cpp
     parameter_test.cpp
 )
