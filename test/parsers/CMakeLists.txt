@@ -7,6 +7,7 @@ set(SOURCES
 	elem_test.cpp
 	integer_test.cpp
 	map_test.cpp
+	match_test.cpp
 	opt_test.cpp
 	parse_result_test.cpp
     phrase_test.cpp
