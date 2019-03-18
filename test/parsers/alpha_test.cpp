@@ -125,5 +125,35 @@ namespace test_whitespace_success {
     static_assert(parsed.result() == ' ');
     static_assert(parsed.next().input == "abc");
 }
+namespace test_whitespaces_empty {
+    constexpr auto parsed = whitespaces()(Input{""});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result() == "");
+    static_assert(parsed.next().input == "");
+}
+namespace test_whitespaces_none {
+    constexpr auto parsed = whitespaces()(Input{"abc"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result() == "");
+    static_assert(parsed.next().input == "abc");
+}
+namespace test_whitespaces_one {
+    constexpr auto parsed = whitespaces()(Input{" abc"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result() == " ");
+    static_assert(parsed.next().input == "abc");
+}
+namespace test_whitespaces_two {
+    constexpr auto parsed = whitespaces()(Input{"  abc"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result() == "  ");
+    static_assert(parsed.next().input == "abc");
+}
+namespace test_whitespaces_five {
+    constexpr auto parsed = whitespaces()(Input{"     abc"});
+    static_assert(parsed.is_success());
+    static_assert(parsed.result() == "     ");
+    static_assert(parsed.next().input == "abc");
+}
 
 }

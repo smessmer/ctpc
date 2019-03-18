@@ -31,4 +31,21 @@ constexpr auto whitespace() {
     return elem(' ');
 }
 
+/**
+ * Match zero or more whitespace characters
+ */
+constexpr auto whitespaces() {
+    return [] (Input input) {
+        // find first non-whitespace character
+        auto current = input.input.begin();
+        while(current != input.input.end() && *current == ' ') {
+            ++current;
+        }
+
+        Input next = Input{std::string_view(current, input.input.end() - current)};
+        std::string_view match(input.input.begin(), current - input.input.begin());
+        return ParseResult<std::string_view>::success(next, match);
+    };
+}
+
 }
